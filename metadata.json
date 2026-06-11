@@ -1,0 +1,6 @@
+{
+  "name": "Logistik Konstruksi",
+  "description": "Aplikasi manajemen logistik dan penagihan konstruksi native kelas enterprise dengan performa tinggi, Room Database, dan visual Deep Dark Mode.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
