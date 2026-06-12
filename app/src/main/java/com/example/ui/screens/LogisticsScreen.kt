@@ -1438,7 +1438,7 @@ fun generateSuratJalanHtml(
                     <div>Hormat Kami,</div>
                     <div style="font-weight: bold;">PT. RAYYAN KARYA</div>
                     <div class="sig-space"></div>
-                    <div style="font-weight: bold; text-decoration: underline;">Supriyadi</div>
+                    <div style="font-weight: bold; text-decoration: underline;">( _________________ )</div>
                     <div style="font-size: 10px; color: #555;">Administrasi Gudang</div>
                 </td>
             </tr>

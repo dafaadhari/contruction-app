@@ -435,6 +435,9 @@ fun BillingScreen(
         } else {
             items(payments) { pay ->
                 val p = projects.find { it.id == pay.projectId }
+                val notesParts = pay.notes.split(" | ITEMS: ")
+                val cleanNotes = notesParts.first()
+                val serializedItems = if (notesParts.size > 1) notesParts[1] else null
                 
                 Card(
                     modifier = Modifier
@@ -494,7 +497,7 @@ fun BillingScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(text = "Keterangan: ${pay.notes}", style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                                Text(text = "Keterangan: $cleanNotes", style = MaterialTheme.typography.bodyMedium, color = Color.White)
                                 Text(
                                     text = "Tanggal: ${SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(pay.paymentDate))}",
                                     style = MaterialTheme.typography.labelSmall,
@@ -508,19 +511,19 @@ fun BillingScreen(
                                     var dpPercent = 100.0
                                     var ppnPercent = 0.0
                                     var poNo = "PO/GEN-${pay.id}"
-                                    if (pay.notes.startsWith("Invoice formal")) {
+                                    if (cleanNotes.startsWith("Invoice formal")) {
                                         val dpRegex = "DP (\\d+\\.\\d+|\\d+)%".toRegex()
-                                        val dpMatch = dpRegex.find(pay.notes)
+                                        val dpMatch = dpRegex.find(cleanNotes)
                                         if (dpMatch != null) {
                                             dpPercent = dpMatch.groupValues[1].toDoubleOrNull() ?: 100.0
                                         }
                                         val ppnRegex = "PPN (\\d+\\.\\d+|\\d+)%".toRegex()
-                                        val ppnMatch = ppnRegex.find(pay.notes)
+                                        val ppnMatch = ppnRegex.find(cleanNotes)
                                         if (ppnMatch != null) {
                                             ppnPercent = ppnMatch.groupValues[1].toDoubleOrNull() ?: 0.0
                                         }
                                         val poRegex = "(?:untuk|for) PO ([\\w\\-/]+)".toRegex()
-                                        val poMatch = poRegex.find(pay.notes)
+                                        val poMatch = poRegex.find(cleanNotes)
                                         if (poMatch != null) {
                                             poNo = poMatch.groupValues[1]
                                         }
@@ -529,23 +532,39 @@ fun BillingScreen(
                                     val formattedDate = SimpleDateFormat("dd MMMM yyyy", Locale("id", "ID")).format(Date(pay.paymentDate))
                                     val payDeliveries = deliveries.filter { it.projectId == pay.projectId && it.status == "SUKSES" }
                                     
-                                    val items = if (payDeliveries.isEmpty()) {
-                                        val baseAmount = pay.amount / (1 + ppnPercent / 100.0) / (dpPercent / 100.0)
-                                        listOf(
-                                            InvoiceItem(
-                                                description = pay.notes,
-                                                quantity = 1.0,
-                                                unit = "Termin",
-                                                unitPrice = baseAmount
-                                            )
-                                        )
+                                    val items = if (!serializedItems.isNullOrBlank()) {
+                                        serializedItems.split(";").mapNotNull { itemStr ->
+                                            val fields = itemStr.split(":")
+                                            if (fields.size >= 4) {
+                                                InvoiceItem(
+                                                    description = fields[0],
+                                                    quantity = fields[1].toDoubleOrNull() ?: 1.0,
+                                                    unit = fields[2],
+                                                    unitPrice = fields[3].toDoubleOrNull() ?: 0.0
+                                                )
+                                            } else {
+                                                null
+                                            }
+                                        }
                                     } else {
-                                        payDeliveries.map {
-                                            InvoiceItem(
-                                                description = it.materialType,
-                                                quantity = it.quantity,
-                                                unit = it.unit,
-                                                unitPrice = it.unitPrice
+                                        if (cleanNotes.startsWith("Invoice formal") && payDeliveries.isNotEmpty()) {
+                                            payDeliveries.map {
+                                                InvoiceItem(
+                                                    description = it.materialType,
+                                                    quantity = it.quantity,
+                                                    unit = it.unit,
+                                                    unitPrice = it.unitPrice
+                                                )
+                                            }
+                                        } else {
+                                            val baseAmount = pay.amount / (1 + ppnPercent / 100.0) / (dpPercent / 100.0)
+                                            listOf(
+                                                InvoiceItem(
+                                                    description = cleanNotes,
+                                                    quantity = 1.0,
+                                                    unit = "Termin",
+                                                    unitPrice = baseAmount
+                                                )
                                             )
                                         }
                                     }

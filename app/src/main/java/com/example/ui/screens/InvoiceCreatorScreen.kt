@@ -199,10 +199,11 @@ fun InvoiceCreatorScreen(
                         if (invoiceNo.isEmpty() || kepadaYth.isEmpty()) {
                             Toast.makeText(context, "Nomor Invoice & Penerima harus diisi!", Toast.LENGTH_SHORT).show()
                         } else {
+                            val serializedItems = initialItems.joinToString(";") { "${it.description}:${it.quantity}:${it.unit}:${it.unitPrice}" }
                             onSaveInvoice(
                                 invoiceNo,
                                 totalTagihanDp,
-                                "Invoice formal DP $dpPercentageInput% + PPN $ppnPercentageInput% untuk PO $poNo, Lokasi: $lokasiInput",
+                                "Invoice formal DP $dpPercentageInput% + PPN $ppnPercentageInput% untuk PO $poNo, Lokasi: $lokasiInput | ITEMS: $serializedItems",
                                 checkIsSettled
                             )
                             Toast.makeText(context, "Invoice berhasil disimpan dan diintegrasikan ke keuangan!", Toast.LENGTH_LONG).show()
@@ -745,69 +746,124 @@ fun InvoiceCreatorScreen(
                                     .weight(1.2f)
                                     .border(1.dp, Color.LightGray)
                             ) {
-                                // Baris 1: TOTAL NILAI KONTRAK DASAR
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(text = "TOTAL NILAI KONTRAK DASAR:", color = Color.DarkGray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                    Text(text = formatRupiahLocal(totalContractDasar), color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                }
-                                
-                                // Baris 2: NILAI (DP) {X}%  - Latar abu-abu sangat muda/krem
-                                HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(Color(0xFFFAFAFA))
-                                        .padding(8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(text = "NILAI (DP) $dpPercentageInput%:", color = Color.DarkGray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                    Text(text = formatRupiahLocal(dpValue), color = Color(0xFF1E88E5), fontSize = 10.sp, fontWeight = FontWeight.Black)
-                                }
-                                HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
+                                if (dpPercentage < 100.0) {
+                                    // Baris 1: TOTAL NILAI KONTRAK DASAR
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "TOTAL NILAI KONTRAK DASAR:", color = Color.DarkGray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text(text = formatRupiahLocal(totalContractDasar), color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    
+                                    // Baris 2: NILAI (DP) {X}%  - Latar abu-abu sangat muda/krem
+                                    HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFFFAFAFA))
+                                            .padding(8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "NILAI (DP) $dpPercentageInput%:", color = Color.DarkGray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text(text = formatRupiahLocal(dpValue), color = Color(0xFF1E88E5), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                    }
+                                    HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
 
-                                // Baris 3: PPN {Y}%
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(text = "PPN $ppnPercentageInput%:", color = Color.DarkGray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                    Text(text = formatRupiahLocal(ppnValue), color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                }
+                                    // Baris 3: PPN {Y}%
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "PPN $ppnPercentageInput%:", color = Color.DarkGray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text(text = formatRupiahLocal(ppnValue), color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
 
-                                // Baris 4: TOTAL TAGIHAN DP (HARUS DIBAYAR) - Latar biru sangat muda
-                                HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(Color(0xFFE6F4FF))
-                                        .padding(8.dp)
-                                ) {
-                                    Text(
-                                        text = "TOTAL TAGIHAN DP (HARUS DIBAYAR):",
-                                        color = Color(0xFF1C3A5E),
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Black
-                                     )
-                                     Spacer(modifier = Modifier.height(2.dp))
-                                     Text(
-                                         text = formatRupiahLocal(totalTagihanDp),
-                                         color = Color.Black,
-                                         fontSize = 13.sp,
-                                         fontWeight = FontWeight.Black,
-                                         textAlign = TextAlign.End,
-                                         modifier = Modifier.fillMaxWidth()
-                                     )
-                                 }
+                                    // Baris 4: TOTAL TAGIHAN DP (HARUS DIBAYAR) - Latar biru sangat muda
+                                    HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFFE6F4FF))
+                                            .padding(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "TOTAL TAGIHAN DP (HARUS DIBAYAR):",
+                                            color = Color(0xFF1C3A5E),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Black
+                                         )
+                                         Spacer(modifier = Modifier.height(2.dp))
+                                         Text(
+                                             text = formatRupiahLocal(totalTagihanDp),
+                                             color = Color.Black,
+                                             fontSize = 13.sp,
+                                             fontWeight = FontWeight.Black,
+                                             textAlign = TextAlign.End,
+                                             modifier = Modifier.fillMaxWidth()
+                                         )
+                                     }
+                                } else {
+                                    // Baris 1: SUBTOTAL NILAI DASAR
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = "SUBTOTAL NILAI DASAR:", color = Color.DarkGray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text(text = formatRupiahLocal(totalContractDasar), color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    }
+
+                                    if (ppnValue > 0.0) {
+                                        HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
+                                        // Baris 2: PPN {Y}%
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(Color(0xFFFAFAFA))
+                                                .padding(8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(text = "PPN $ppnPercentageInput%:", color = Color.DarkGray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                            Text(text = formatRupiahLocal(ppnValue), color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+
+                                    // Baris 3: TOTAL TAGIHAN (HARUS DIBAYAR) - Latar biru sangat muda
+                                    HorizontalDivider(color = Color.LightGray, thickness = 1.dp)
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFFE6F4FF))
+                                            .padding(8.dp)
+                                    ) {
+                                        Text(
+                                            text = "TOTAL TAGIHAN (HARUS DIBAYAR):",
+                                            color = Color(0xFF1C3A5E),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Black
+                                         )
+                                         Spacer(modifier = Modifier.height(2.dp))
+                                         Text(
+                                             text = formatRupiahLocal(totalTagihanDp),
+                                             color = Color.Black,
+                                             fontSize = 13.sp,
+                                             fontWeight = FontWeight.Black,
+                                             textAlign = TextAlign.End,
+                                             modifier = Modifier.fillMaxWidth()
+                                         )
+                                     }
+                                }
                             }
                         }
 
@@ -1001,8 +1057,11 @@ fun InvoiceCreatorScreen(
 
 // Local formatters to avoid import errors
 private fun formatRupiahLocal(value: Double): String {
-    val formatter = DecimalFormat("#,###,###,###,###")
-    return "Rp " + formatter.format(value).replace(",", ".")
+    val symbols = java.text.DecimalFormatSymbols(Locale.US).apply {
+        groupingSeparator = '.'
+    }
+    val formatter = DecimalFormat("#,###", symbols)
+    return "Rp " + formatter.format(value)
 }
 
 // Indonesian Terbilang generator spelling engine
@@ -1070,6 +1129,48 @@ fun generateInvoiceHtml(
     val formattedPpnVal = formatRupiahLocal(ppnVal)
     val formattedTotalTagihan = formatRupiahLocal(totalTagihan)
     val terbilangText = angkaToTerbilang(totalTagihan)
+
+    val summaryTableContent = if (dpPercent < 100.0) {
+        """
+        <tr>
+            <td style="padding: 6px; font-weight: bold; color: #333;">TOTAL NILAI KONTRAK DASAR:</td>
+            <td style="padding: 6px; font-weight: bold; text-align: right;">$formattedContractDasar</td>
+        </tr>
+        <tr class="bg-accent" style="border-top: 1px solid #ddd; border-bottom: 1px solid #ddd;">
+            <td style="padding: 6px; font-weight: bold; color: #333;">NILAI (DP) ${dpPercent.toInt()}%:</td>
+            <td class="total-blue" style="padding: 6px; font-weight: bold; text-align: right;">$formattedDpVal</td>
+        </tr>
+        <tr>
+            <td style="padding: 6px; font-weight: bold; color: #333;">PPN ${ppnPercent.toInt()}%:</td>
+            <td style="padding: 6px; font-weight: bold; text-align: right;">$formattedPpnVal</td>
+        </tr>
+        <tr class="bg-grand" style="border-top: 1px solid #ddd;">
+            <td colspan="2" style="padding: 8px 6px;">
+                <div class="total-grand-title">TOTAL TAGIHAN DP (HARUS DIBAYAR):</div>
+                <div class="total-grand-val">$formattedTotalTagihan</div>
+            </td>
+        </tr>
+        """.trimIndent()
+    } else {
+        """
+        <tr>
+            <td style="padding: 6px; font-weight: bold; color: #333;">SUBTOTAL NILAI DASAR:</td>
+            <td style="padding: 6px; font-weight: bold; text-align: right;">$formattedContractDasar</td>
+        </tr>
+        """ + (if (ppnPercent > 0.0) """
+        <tr class="bg-accent" style="border-top: 1px solid #ddd; border-bottom: 1px solid #ddd;">
+            <td style="padding: 6px; font-weight: bold; color: #333;">PPN ${ppnPercent.toInt()}%:</td>
+            <td style="padding: 6px; font-weight: bold; text-align: right;">$formattedPpnVal</td>
+        </tr>
+        """ else "") + """
+        <tr class="bg-grand" style="border-top: 1px solid #ddd;">
+            <td colspan="2" style="padding: 8px 6px;">
+                <div class="total-grand-title">TOTAL TAGIHAN (HARUS DIBAYAR):</div>
+                <div class="total-grand-val">$formattedTotalTagihan</div>
+            </td>
+        </tr>
+        """.trimIndent()
+    }
 
     return """
     <!DOCTYPE html>
@@ -1314,28 +1415,28 @@ fun generateInvoiceHtml(
                     <div class="meta-box-title">Data Dokumen</div>
                     <div class="meta-row">
                         <span class="meta-label">No. Invoice:</span>
-                        <span class="meta-val" style="color: #000;">${'$'}invoiceNo</span>
+                        <span class="meta-val" style="color: #000;">$invoiceNo</span>
                     </div>
                     <div class="meta-row">
                         <span class="meta-label">Tanggal:</span>
-                        <span class="meta-val">${'$'}tanggal</span>
+                        <span class="meta-val">$tanggal</span>
                     </div>
                     <div class="meta-row">
                         <span class="meta-label">No. PO:</span>
-                        <span class="meta-val">${'$'}poNo</span>
+                        <span class="meta-val">$poNo</span>
                     </div>
                 </td>
                 <td style="width: 4%;"></td>
                 <td class="meta-box" style="width: 48%;">
                     <div class="meta-box-title">Kepada Yth</div>
-                    <div class="meta-row" style="font-weight: bold; font-size: 11px; margin-bottom: 4px;">${'$'}kepadaYth</div>
+                    <div class="meta-row" style="font-weight: bold; font-size: 11px; margin-bottom: 4px;">$kepadaYth</div>
                     <div class="meta-box-title" style="margin-top: 6px;">Lokasi Pengiriman</div>
-                    <div class="meta-row" style="font-weight: 500;">${'$'}lokasi</div>
+                    <div class="meta-row" style="font-weight: 500;">$lokasi</div>
                 </td>
             </tr>
         </table>
 
-        <table class="materials-table">
+         <table class="materials-table">
             <thead>
                 <tr>
                     <th style="width: 5%; text-align: center;">No</th>
@@ -1347,7 +1448,7 @@ fun generateInvoiceHtml(
                 </tr>
             </thead>
             <tbody>
-                ${'$'}tableRows
+                $tableRows
             </tbody>
         </table>
 
@@ -1355,7 +1456,7 @@ fun generateInvoiceHtml(
             <tr>
                 <td class="terbilang-box" style="vertical-align: top;">
                     <div class="terbilang-title">TERBILANG:</div>
-                    <div class="terbilang-text"># ${'$'}terbilangText #</div>
+                    <div class="terbilang-text"># $terbilangText #</div>
                     <div class="payment-info">
                         INFO PEMBAYARAN:<br>
                         Metode Pembayaran: Bank BCA A/N Supriyadi A/C 2453343316
@@ -1364,24 +1465,7 @@ fun generateInvoiceHtml(
                 <td style="width: 5%;"></td>
                 <td class="totals-box" style="vertical-align: top;">
                     <table style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                            <td style="padding: 6px; font-weight: bold; color: #333;">TOTAL NILAI KONTRAK DASAR:</td>
-                            <td style="padding: 6px; font-weight: bold; text-align: right;">${'$'}formattedContractDasar</td>
-                        </tr>
-                        <tr class="bg-accent" style="border-top: 1px solid #ddd; border-bottom: 1px solid #ddd;">
-                            <td style="padding: 6px; font-weight: bold; color: #333;">NILAI (DP) ${'$'}{dpPercent.toInt()}%:</td>
-                            <td class="total-blue" style="padding: 6px; font-weight: bold; text-align: right;">${'$'}formattedDpVal</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 6px; font-weight: bold; color: #333;">PPN ${'$'}{ppnPercent.toInt()}%:</td>
-                            <td style="padding: 6px; font-weight: bold; text-align: right;">${'$'}formattedPpnVal</td>
-                        </tr>
-                        <tr class="bg-grand" style="border-top: 1px solid #ddd;">
-                            <td colspan="2" style="padding: 8px 6px;">
-                                <div class="total-grand-title">TOTAL TAGIHAN DP (HARUS DIBAYAR):</div>
-                                <div class="total-grand-val">${'$'}formattedTotalTagihan</div>
-                            </td>
-                        </tr>
+                        $summaryTableContent
                     </table>
                 </td>
             </tr>
@@ -1392,14 +1476,14 @@ fun generateInvoiceHtml(
                 <td class="sig-col">
                     <div>Penerima / Pemesan</div>
                     <div class="sig-space"></div>
-                    <div style="font-weight: bold; text-decoration: underline;">( ${'$'}kepadaYth )</div>
+                    <div style="font-weight: bold; text-decoration: underline;">( $kepadaYth )</div>
                     <div style="font-size: 10px; color: #555;">Tanda Tangan & Cap Proyek</div>
                 </td>
                 <td class="sig-col">
                     <div>Hormat Kami,</div>
                     <div style="font-weight: bold;">PT. RAYYAN KARYA</div>
                     <div class="sig-space"></div>
-                    <div style="font-weight: bold; text-decoration: underline;">Supriyadi</div>
+                    <div style="font-weight: bold; text-decoration: underline;">( _________________ )</div>
                     <div style="font-size: 10px; color: #555;">Administrasi & Keuangan</div>
                 </td>
             </tr>
