@@ -2,16 +2,16 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val BlackPure = Color(0xFF000000)
-val DarkGrey = Color(0xFF0A0A0A)
-val MediumGrey = Color(0xFF141414)
-val BorderGrey = Color(0xFF222222)
-val TextPrimary = Color(0xFFFFFFFF)
-val TextSecondary = Color(0xFF9E9E9E)
+val BlackPure = Color(0xFF0F111A) // Elegant Obsidian
+val DarkGrey = Color(0xFF161B26) // Sleek Luxury Card Dark Slate
+val MediumGrey = Color(0xFF1F2636) // Input or Nested element slate
+val BorderGrey = Color(0xFF2E394E) // Soft elegant border gray
+val TextPrimary = Color(0xFFF3F4F6) // Warm off-white
+val TextSecondary = Color(0xFF9EAFCB) // Balanced steel grey text
 
 // Key Corporate Blue (Bright Corporate Blue for contrast)
-val CorporateBlue = Color(0xFF5CB8FF)
-val CorporateBlueMuted = Color(0xFF1E3F66)
+val CorporateBlue = Color(0xFF4A90E2) // Sophisticated Blue
+val CorporateBlueMuted = Color(0xFF1B2F4A) // Elegant dark slate-blue
 
 // Keep legacy names mapped to Corporate Blue for compatibility and seamless migration
 val LimeNeon = CorporateBlue

@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.ConstructionProject
 import com.example.data.LogisticsDelivery
 import com.example.ui.components.RayyanKaryaLogo
+import com.example.ui.components.PdfPrintUtil
 import com.example.ui.theme.*
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
@@ -158,28 +159,64 @@ fun InvoiceCreatorScreen(
                 }
             }
             
-            Button(
-                onClick = {
-                    if (invoiceNo.isEmpty() || kepadaYth.isEmpty()) {
-                        Toast.makeText(context, "Nomor Invoice & Penerima harus diisi!", Toast.LENGTH_SHORT).show()
-                    } else {
-                        onSaveInvoice(
-                            invoiceNo,
-                            totalTagihanDp,
-                            "Invoice formal DP $dpPercentageInput% + PPN $ppnPercentageInput% untuk PO $poNo, Lokasi: $lokasiInput",
-                            checkIsSettled
-                        )
-                        Toast.makeText(context, "Invoice berhasil disimpan dan diintegrasikan ke keuangan!", Toast.LENGTH_LONG).show()
-                        onDismiss()
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = CorporateBlue),
-                shape = SharpShapes.small,
-                modifier = Modifier.testTag("save_invoice_button")
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(imageVector = Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(text = "KIRIM & SIMPAN", color = Color.Black, style = MaterialTheme.typography.labelSmall)
+                // Real Android Native "CETAK PDF" Button
+                Button(
+                    onClick = {
+                        if (invoiceNo.isEmpty() || kepadaYth.isEmpty()) {
+                            Toast.makeText(context, "Isi Nomor Invoice & Penerima terlebih dahulu!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            val html = generateInvoiceHtml(
+                                invoiceNo = invoiceNo,
+                                tanggal = tanggalInput,
+                                poNo = poNo,
+                                kepadaYth = kepadaYth,
+                                lokasi = lokasiInput,
+                                items = initialItems,
+                                dpPercent = dpPercentage,
+                                dpVal = dpValue,
+                                ppnPercent = ppnPercentage,
+                                ppnVal = ppnValue,
+                                totalTagihan = totalTagihanDp
+                            )
+                            PdfPrintUtil.printHtml(context, html, "Invoice_${invoiceNo.replace("/", "_")}")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E88E5)),
+                    shape = SharpShapes.small,
+                    modifier = Modifier.testTag("print_invoice_button")
+                ) {
+                    Icon(imageVector = Icons.Default.Print, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "CETAK PDF", color = Color.White, style = MaterialTheme.typography.labelSmall)
+                }
+
+                Button(
+                    onClick = {
+                        if (invoiceNo.isEmpty() || kepadaYth.isEmpty()) {
+                            Toast.makeText(context, "Nomor Invoice & Penerima harus diisi!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            onSaveInvoice(
+                                invoiceNo,
+                                totalTagihanDp,
+                                "Invoice formal DP $dpPercentageInput% + PPN $ppnPercentageInput% untuk PO $poNo, Lokasi: $lokasiInput",
+                                checkIsSettled
+                            )
+                            Toast.makeText(context, "Invoice berhasil disimpan dan diintegrasikan ke keuangan!", Toast.LENGTH_LONG).show()
+                            onDismiss()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = CorporateBlue),
+                    shape = SharpShapes.small,
+                    modifier = Modifier.testTag("save_invoice_button")
+                ) {
+                    Icon(imageVector = Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "KIRIM & SIMPAN", color = Color.Black, style = MaterialTheme.typography.labelSmall)
+                }
             }
         }
 
@@ -994,4 +1031,380 @@ fun angkaToTerbilang(nominal: Double): String {
     
     val hasil = sebut(angka).replace("\\s+".toRegex(), " ").trim()
     return "$hasil Rupiah"
+}
+
+// Highly stylized HTML document generator for official PDF print outputs representing dynamic state configurations
+fun generateInvoiceHtml(
+    invoiceNo: String,
+    tanggal: String,
+    poNo: String,
+    kepadaYth: String,
+    lokasi: String,
+    items: List<InvoiceItem>,
+    dpPercent: Double,
+    dpVal: Double,
+    ppnPercent: Double,
+    ppnVal: Double,
+    totalTagihan: Double
+): String {
+    val totalContractDasar = items.sumOf { it.total }
+
+    val tableRows = StringBuilder()
+    items.forEachIndexed { index, item ->
+        val formattedPrice = formatRupiahLocal(item.unitPrice)
+        val formattedTotal = formatRupiahLocal(item.total)
+        tableRows.append("""
+            <tr>
+                <td style="text-align: center;">${index + 1}</td>
+                <td style="font-weight: bold;">${item.description}</td>
+                <td style="text-align: center;">${item.quantity}</td>
+                <td style="text-align: center;">${item.unit}</td>
+                <td style="text-align: right;">$formattedPrice</td>
+                <td style="text-align: right; font-weight: bold;">$formattedTotal</td>
+            </tr>
+        """.trimIndent())
+    }
+
+    val formattedContractDasar = formatRupiahLocal(totalContractDasar)
+    val formattedDpVal = formatRupiahLocal(dpVal)
+    val formattedPpnVal = formatRupiahLocal(ppnVal)
+    val formattedTotalTagihan = formatRupiahLocal(totalTagihan)
+    val terbilangText = angkaToTerbilang(totalTagihan)
+
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Invoice - $invoiceNo</title>
+        <style>
+            body {
+                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                color: #000;
+                margin: 30px;
+                line-height: 1.4;
+                font-size: 11px;
+            }
+            .header-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 5px;
+            }
+            .header-left {
+                width: 75%;
+                vertical-align: top;
+            }
+            .header-right {
+                width: 25%;
+                text-align: right;
+                vertical-align: top;
+            }
+            .company-name {
+                color: #1C3A5E;
+                font-size: 21px;
+                font-weight: 900;
+                margin: 0;
+                letter-spacing: 1px;
+            }
+            .company-desc {
+                font-size: 10px;
+                font-weight: bold;
+                margin: 4px 0 2px 0;
+            }
+            .company-contact {
+                font-size: 9px;
+                color: #444;
+                margin: 0;
+            }
+            .logo-r {
+                font-family: 'Times New Roman', Times, Serif;
+                font-size: 38px;
+                font-weight: 900;
+                color: #1C3A5E;
+                line-height: 1;
+                margin-right: 15px;
+            }
+            .divider-double {
+                border-top: 4px solid #1C3A5E;
+                border-bottom: 2px solid #000;
+                height: 4px;
+                margin: 8px 0 16px 0;
+            }
+            .doc-title {
+                text-align: center;
+                font-size: 22px;
+                font-weight: 900;
+                letter-spacing: 4px;
+                text-decoration: underline;
+                margin-bottom: 20px;
+            }
+            .meta-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 18px;
+            }
+            .meta-box {
+                width: 48%;
+                border: 1px solid #ddd;
+                padding: 10px;
+                vertical-align: top;
+            }
+            .meta-box-title {
+                font-size: 9px;
+                color: #555;
+                font-weight: bold;
+                text-transform: uppercase;
+                margin-bottom: 5px;
+                border-bottom: 1px solid #eee;
+                padding-bottom: 2px;
+            }
+            .meta-row {
+                font-size: 11px;
+                margin-bottom: 4px;
+            }
+            .meta-label {
+                display: inline-block;
+                width: 80px;
+                color: #555;
+                font-weight: bold;
+            }
+            .meta-val {
+                font-weight: bold;
+            }
+            .materials-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 15px;
+                font-size: 10px;
+            }
+            .materials-table th {
+                background-color: #1C3A5E;
+                color: #ffffff;
+                font-weight: bold;
+                border: 1px solid #1C3A5E;
+                padding: 6px 8px;
+                text-align: left;
+            }
+            .materials-table td {
+                border: 1px solid #ddd;
+                padding: 6px 8px;
+            }
+            .summary-container {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 20px;
+            }
+            .terbilang-box {
+                width: 55%;
+                border: 1px solid #1C3A5E;
+                background-color: rgba(28, 58, 94, 0.03);
+                padding: 10px;
+                vertical-align: top;
+            }
+            .terbilang-title {
+                font-weight: 900;
+                font-size: 9px;
+                color: #1C3A5E;
+                letter-spacing: 1px;
+                margin-bottom: 4px;
+            }
+            .terbilang-text {
+                font-weight: bold;
+                font-size: 11px;
+                font-style: italic;
+            }
+            .totals-box {
+                width: 40%;
+                border: 1px solid #ddd;
+                vertical-align: top;
+                font-size: 10px;
+            }
+            .totals-row {
+                padding: 6px 8px;
+                border-bottom: 1px solid #ddd;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                box-sizing: border-box;
+            }
+            .totals-row.flex-row {
+                display: table;
+                width: 100%;
+            }
+            .totals-row.flex-row span {
+                display: table-cell;
+            }
+            .bg-accent {
+                background-color: #FAFAFA;
+            }
+            .bg-grand {
+                background-color: #E6F4FF;
+            }
+            .total-label {
+                font-weight: bold;
+                color: #333;
+                width: 60%;
+            }
+            .total-val {
+                font-weight: bold;
+                text-align: right;
+                width: 40%;
+            }
+            .total-blue {
+                color: #1E88E5;
+                font-weight: 900;
+            }
+            .total-grand-title {
+                color: #1C3A5E;
+                font-weight: 900;
+                font-size: 9px;
+                margin-bottom: 2px;
+            }
+            .total-grand-val {
+                font-size: 13px;
+                font-weight: 950;
+                color: #000;
+                text-align: right;
+            }
+            .payment-info {
+                font-size: 9px;
+                border: 1px solid #ddd;
+                background-color: #F9F9F9;
+                padding: 6px;
+                margin-top: 8px;
+                font-weight: bold;
+            }
+            .signatures {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 40px;
+                font-size: 11px;
+            }
+            .sig-col {
+                width: 50%;
+                vertical-align: top;
+                text-align: center;
+            }
+            .sig-space {
+                height: 55px;
+            }
+        </style>
+    </head>
+    <body>
+        <table class="header-table">
+            <tr>
+                <td class="header-left">
+                    <div class="company-name">PT. RAYYAN KARYA</div>
+                    <div class="company-desc">Supplier Atap Baja Ringan, Aluminium, dan Material Konstruksi</div>
+                    <div class="company-contact">Email: cvrayyanalumunium@gmail.com | Hubungi: 081381080745</div>
+                </td>
+                <td class="header-right">
+                    <div class="logo-r">R</div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="divider-double"></div>
+
+        <div class="doc-title">INVOICE</div>
+
+        <table class="meta-table">
+            <tr>
+                <td class="meta-box" style="width: 48%;">
+                    <div class="meta-box-title">Data Dokumen</div>
+                    <div class="meta-row">
+                        <span class="meta-label">No. Invoice:</span>
+                        <span class="meta-val" style="color: #000;">${'$'}invoiceNo</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Tanggal:</span>
+                        <span class="meta-val">${'$'}tanggal</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">No. PO:</span>
+                        <span class="meta-val">${'$'}poNo</span>
+                    </div>
+                </td>
+                <td style="width: 4%;"></td>
+                <td class="meta-box" style="width: 48%;">
+                    <div class="meta-box-title">Kepada Yth</div>
+                    <div class="meta-row" style="font-weight: bold; font-size: 11px; margin-bottom: 4px;">${'$'}kepadaYth</div>
+                    <div class="meta-box-title" style="margin-top: 6px;">Lokasi Pengiriman</div>
+                    <div class="meta-row" style="font-weight: 500;">${'$'}lokasi</div>
+                </td>
+            </tr>
+        </table>
+
+        <table class="materials-table">
+            <thead>
+                <tr>
+                    <th style="width: 5%; text-align: center;">No</th>
+                    <th style="width: 45%;">Deskripsi Barang / Material</th>
+                    <th style="width: 10%; text-align: center;">Jumlah</th>
+                    <th style="width: 10%; text-align: center;">Satuan</th>
+                    <th style="width: 15%; text-align: right;">Harga (Rp)</th>
+                    <th style="width: 15%; text-align: right;">Total (Rp)</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${'$'}tableRows
+            </tbody>
+        </table>
+
+        <table class="summary-container">
+            <tr>
+                <td class="terbilang-box" style="vertical-align: top;">
+                    <div class="terbilang-title">TERBILANG:</div>
+                    <div class="terbilang-text"># ${'$'}terbilangText #</div>
+                    <div class="payment-info">
+                        INFO PEMBAYARAN:<br>
+                        Metode Pembayaran: Bank BCA A/N Supriyadi A/C 2453343316
+                    </div>
+                </td>
+                <td style="width: 5%;"></td>
+                <td class="totals-box" style="vertical-align: top;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 6px; font-weight: bold; color: #333;">TOTAL NILAI KONTRAK DASAR:</td>
+                            <td style="padding: 6px; font-weight: bold; text-align: right;">${'$'}formattedContractDasar</td>
+                        </tr>
+                        <tr class="bg-accent" style="border-top: 1px solid #ddd; border-bottom: 1px solid #ddd;">
+                            <td style="padding: 6px; font-weight: bold; color: #333;">NILAI (DP) ${'$'}{dpPercent.toInt()}%:</td>
+                            <td class="total-blue" style="padding: 6px; font-weight: bold; text-align: right;">${'$'}formattedDpVal</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 6px; font-weight: bold; color: #333;">PPN ${'$'}{ppnPercent.toInt()}%:</td>
+                            <td style="padding: 6px; font-weight: bold; text-align: right;">${'$'}formattedPpnVal</td>
+                        </tr>
+                        <tr class="bg-grand" style="border-top: 1px solid #ddd;">
+                            <td colspan="2" style="padding: 8px 6px;">
+                                <div class="total-grand-title">TOTAL TAGIHAN DP (HARUS DIBAYAR):</div>
+                                <div class="total-grand-val">${'$'}formattedTotalTagihan</div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        <table class="signatures">
+            <tr>
+                <td class="sig-col">
+                    <div>Penerima / Pemesan</div>
+                    <div class="sig-space"></div>
+                    <div style="font-weight: bold; text-decoration: underline;">( ${'$'}kepadaYth )</div>
+                    <div style="font-size: 10px; color: #555;">Tanda Tangan & Cap Proyek</div>
+                </td>
+                <td class="sig-col">
+                    <div>Hormat Kami,</div>
+                    <div style="font-weight: bold;">PT. RAYYAN KARYA</div>
+                    <div class="sig-space"></div>
+                    <div style="font-weight: bold; text-decoration: underline;">Supriyadi</div>
+                    <div style="font-size: 10px; color: #555;">Administrasi & Keuangan</div>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """.trimIndent()
 }

@@ -30,12 +30,12 @@ private val DarkColorScheme = darkColorScheme(
     onError = Color.Black
 )
 
-// Minimalist, sharp engineering-grade shapes of maximum 4dp corners as requested
+// Elegant, modern minimalist shapes with soft corners for a premium, clean aesthetic
 val SharpShapes = Shapes(
-    small = RoundedCornerShape(2.dp),
-    medium = RoundedCornerShape(4.dp),
-    large = RoundedCornerShape(4.dp),
-    extraLarge = RoundedCornerShape(4.dp)
+    small = RoundedCornerShape(6.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(16.dp)
 )
 
 @Composable

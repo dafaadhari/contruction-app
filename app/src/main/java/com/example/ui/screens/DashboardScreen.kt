@@ -2,11 +2,11 @@ package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.LogisticsDelivery
+import com.example.ui.components.ManualBookDialog
 import com.example.ui.AppViewModel
 import com.example.ui.theme.*
 import java.text.DecimalFormat
@@ -38,6 +39,8 @@ fun DashboardScreen(
     val deliveries by viewModel.deliveries.collectAsState()
     val projects by viewModel.projects.collectAsState()
 
+    var showManualDialog by remember { mutableStateOf(false) }
+
     val pendingDeliveries = remember(deliveries) {
         deliveries.filter { it.status == "TERTUNDA" }
     }
@@ -46,12 +49,12 @@ fun DashboardScreen(
         modifier = modifier
             .fillMaxSize()
             .background(BlackPure)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+            .padding(horizontal = 20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Top Header Title block
+        // Simple Elegant Header
         item {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(18.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -59,87 +62,132 @@ fun DashboardScreen(
             ) {
                 Column {
                     Text(
-                        text = "CONSTRUCTION LOGISTICS",
+                        text = "SISTEM MONITORING",
                         style = MaterialTheme.typography.labelSmall,
-                        color = LimeNeon,
-                        letterSpacing = 2.sp
+                        color = CorporateBlue,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp
                     )
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Dasbor Utama",
-                        style = MaterialTheme.typography.displayMedium,
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                 }
+                
                 IconButton(
-                    onClick = { /* Refresh could go here */ },
-                    modifier = Modifier
-                        .border(1.dp, BorderGrey, SharpShapes.small)
-                        .size(40.dp)
+                    onClick = { /* Action to refresh */ },
+                    colors = IconButtonDefaults.iconButtonColors(
+                        containerColor = DarkGrey,
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier.size(38.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh",
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
         }
 
-        // Summary Cards Grid
+        // Minimalist PDF Manual triggers
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                // Active Projects
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showManualDialog = true }
+                    .testTag("dashboard_manual_book_card"),
+                colors = CardDefaults.cardColors(containerColor = DarkGrey),
+                shape = SharpShapes.medium
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MenuBook,
+                        contentDescription = "Buku Panduan",
+                        tint = CorporateBlue,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Buku Panduan Operasional",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Petunjuk digital penginputan surat jalan, integrasi PPN/DP, dan cetak PDF invoice lunas.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ArrowForward,
+                        contentDescription = "Buka",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
+
+        // Clean & compact Summary Cards
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SummaryCard(
-                    title = "TOTAL PROYEK AKTIF",
+                    title = "PROYEK AKTIF",
                     value = "${summary.activeProjects}",
-                    subtitle = "Situs konstruksi dalam pengawasan",
+                    subtitle = "Situs konstruksi terdaftar",
                     icon = Icons.Default.Business,
                     valueColor = Color.White,
                     testTag = "summary_active_projects"
                 )
 
-                // Pending Deliveries
                 SummaryCard(
-                    title = "PENGIRIMAN MATERIAL TERTUNDA",
+                    title = "PENGIRIMAN TERTUNDA",
                     value = "${summary.pendingDeliveries}",
-                    subtitle = "Surat jalan menunggu konfirmasi lapangan",
+                    subtitle = "Menunggu verifikasi penerimaan",
                     icon = Icons.Default.LocalShipping,
                     valueColor = if (summary.pendingDeliveries > 0) ColorPending else ColorSuccess,
                     testTag = "summary_pending_deliveries"
                 )
 
-                // Sisa Penagihan
                 SummaryCard(
-                    title = "TOTAL SISA PENAGIHAN",
+                    title = "SISA PENAGIHAN KONTRAK",
                     value = formatRupiah(summary.totalSisaPenagihan),
-                    subtitle = "Volume material terkirim - sudah terbayar",
+                    subtitle = "Akumulasi nilai material belum tertagih",
                     icon = Icons.Default.AccountBalanceWallet,
-                    valueColor = LimeNeon,
+                    valueColor = CorporateBlue,
                     testTag = "summary_billing_remaining"
                 )
             }
         }
 
-        // Weekly Delivery Intensity (Bar Chart)
+        // Clean Bar Chart with Soft Columns
         item {
             Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, BorderGrey, SharpShapes.medium),
+                modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = DarkGrey),
                 shape = SharpShapes.medium
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(18.dp)) {
                     Text(
                         text = "INTENSITAS PENGIRIMAN DATA MINGGUAN (Rp)",
                         style = MaterialTheme.typography.labelSmall,
                         color = TextSecondary,
+                        fontWeight = FontWeight.Bold,
                         letterSpacing = 1.sp
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     
-                    // Simple pure mathematical custom rendering of a beautiful bar chart
                     val days = listOf("SEN", "SEL", "RAB", "KAM", "JUM", "SAB", "MIN")
                     val maxVal = weeklyIntensity.maxOrNull() ?: 1.0
                     val scaleMax = if (maxVal == 0.0) 1.0 else maxVal
@@ -147,17 +195,12 @@ fun DashboardScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(160.dp),
+                            .height(130.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.Bottom
                     ) {
                         weeklyIntensity.forEachIndexed { index, value ->
                             val heightRatio = (value / scaleMax).toFloat()
-                            val barHeightModifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(heightRatio.coerceAtLeast(0.04f))
-                                .padding(horizontal = 4.dp)
-                                .background(if (value > 0) LimeNeon else BorderGrey)
 
                             Column(
                                 modifier = Modifier
@@ -170,19 +213,27 @@ fun DashboardScreen(
                                     Text(
                                         text = formatShortRupiah(value),
                                         style = TextStyle(
-                                            fontFamily = FontFamily.SansSerif,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 9.sp
                                         ),
-                                        color = LimeNeon,
+                                        color = CorporateBlue,
                                         modifier = Modifier.padding(bottom = 4.dp)
                                     )
                                 }
-                                Box(modifier = barHeightModifier)
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .width(16.dp)
+                                        .fillMaxHeight(heightRatio.coerceAtLeast(0.06f))
+                                        .background(
+                                            color = if (value > 0) CorporateBlue else BorderGrey,
+                                            shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
+                                        )
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = days[index],
                                     style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 9.sp,
                                     color = if (value > 0) Color.White else TextSecondary
                                 )
                             }
@@ -196,19 +247,20 @@ fun DashboardScreen(
         if (pendingDeliveries.isNotEmpty()) {
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
                         imageVector = Icons.Default.Warning,
                         contentDescription = "Penting",
                         tint = ColorPending,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(14.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Konfirmasi Pengiriman Masuk",
+                        text = "Konfirmasi Pengiriman",
                         style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
                         color = Color.White
                     )
                 }
@@ -221,7 +273,6 @@ fun DashboardScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, BorderGrey, SharpShapes.medium)
                         .testTag("pending_delivery_item_${delivery.id}"),
                     colors = CardDefaults.cardColors(containerColor = DarkGrey),
                     shape = SharpShapes.medium
@@ -229,7 +280,7 @@ fun DashboardScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .padding(14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -237,11 +288,12 @@ fun DashboardScreen(
                             Text(
                                 text = projectName,
                                 style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
                                 color = Color.White,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "${delivery.materialType} | Vol: ${delivery.quantity} ${delivery.unit}",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -249,16 +301,19 @@ fun DashboardScreen(
                             )
                             Text(
                                 text = "Sopir: ${delivery.driverName} (${delivery.plateNumber})",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodySmall,
                                 color = TextSecondary
                             )
                         }
 
                         Button(
                             onClick = { viewModel.updateDeliveryStatus(delivery.id, "SUKSES") },
-                            colors = ButtonDefaults.buttonColors(containerColor = LimeNeon),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                            shape = SharpShapes.small,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = CorporateBlue,
+                                contentColor = Color.White
+                            ),
+                            contentPadding = PaddingValues(horizontal = 14.dp),
+                            shape = SharpShapes.medium,
                             modifier = Modifier
                                 .height(32.dp)
                                 .testTag("verify_delivery_button_${delivery.id}")
@@ -266,7 +321,8 @@ fun DashboardScreen(
                             Text(
                                 text = "TERIMA",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.Black
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
                             )
                         }
                     }
@@ -275,16 +331,14 @@ fun DashboardScreen(
         } else {
             item {
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, BorderGrey, SharpShapes.medium),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = DarkGrey),
                     shape = SharpShapes.medium
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
+                            .padding(20.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -292,11 +346,11 @@ fun DashboardScreen(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Semua Sukses",
                                 tint = ColorSuccess,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Semua pengiriman lapangan telah diferivikasi",
+                                text = "Semua pengiriman lapangan selesai terverifikasi",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = TextSecondary
                             )
@@ -307,8 +361,12 @@ fun DashboardScreen(
         }
         
         item {
-            Spacer(modifier = Modifier.height(80.dp)) // Padding for BottomNav
+            Spacer(modifier = Modifier.height(50.dp)) // Nice footer padding
         }
+    }
+
+    if (showManualDialog) {
+        ManualBookDialog(onDismiss = { showManualDialog = false })
     }
 }
 
@@ -324,7 +382,6 @@ fun SummaryCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, BorderGrey, SharpShapes.medium)
             .testTag(testTag),
         colors = CardDefaults.cardColors(containerColor = DarkGrey),
         shape = SharpShapes.medium
@@ -341,31 +398,36 @@ fun SummaryCard(
                     text = title,
                     style = MaterialTheme.typography.labelSmall,
                     color = TextSecondary,
+                    fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = value,
-                    style = MaterialTheme.typography.displayMedium,
+                    style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     color = valueColor
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = TextSecondary
                 )
             }
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = valueColor.copy(alpha = 0.8f),
+            Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .border(1.dp, BorderGrey, SharpShapes.small)
-                    .padding(8.dp)
-            )
+                    .size(42.dp)
+                    .background(MediumGrey, SharpShapes.medium),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = valueColor,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }

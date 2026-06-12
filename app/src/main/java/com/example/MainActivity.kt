@@ -30,6 +30,7 @@ import com.example.ui.screens.LogisticsScreen
 import com.example.ui.theme.BlackPure
 import com.example.ui.theme.BorderGrey
 import com.example.ui.theme.DarkGrey
+import com.example.ui.theme.TextSecondary
 import com.example.ui.components.RayyanKaryaLogo
 import com.example.ui.theme.CorporateBlue
 import com.example.ui.theme.LimeNeon
@@ -111,11 +112,11 @@ class MainActivity : ComponentActivity() {
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = Color.Black,
-                                        selectedTextColor = LimeNeon,
-                                        unselectedIconColor = Color.White,
-                                        unselectedTextColor = Color.White.copy(alpha = 0.6f),
-                                        indicatorColor = LimeNeon
+                                        selectedIconColor = CorporateBlue,
+                                        selectedTextColor = CorporateBlue,
+                                        unselectedIconColor = TextSecondary,
+                                        unselectedTextColor = TextSecondary,
+                                        indicatorColor = CorporateBlue.copy(alpha = 0.12f)
                                     ),
                                     modifier = Modifier.testTag("tab_dashboard")
                                 )
@@ -131,11 +132,11 @@ class MainActivity : ComponentActivity() {
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = Color.Black,
-                                        selectedTextColor = LimeNeon,
-                                        unselectedIconColor = Color.White,
-                                        unselectedTextColor = Color.White.copy(alpha = 0.6f),
-                                        indicatorColor = LimeNeon
+                                        selectedIconColor = CorporateBlue,
+                                        selectedTextColor = CorporateBlue,
+                                        unselectedIconColor = TextSecondary,
+                                        unselectedTextColor = TextSecondary,
+                                        indicatorColor = CorporateBlue.copy(alpha = 0.12f)
                                     ),
                                     modifier = Modifier.testTag("tab_logistics")
                                 )
@@ -151,11 +152,11 @@ class MainActivity : ComponentActivity() {
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = Color.Black,
-                                        selectedTextColor = LimeNeon,
-                                        unselectedIconColor = Color.White,
-                                        unselectedTextColor = Color.White.copy(alpha = 0.6f),
-                                        indicatorColor = LimeNeon
+                                        selectedIconColor = CorporateBlue,
+                                        selectedTextColor = CorporateBlue,
+                                        unselectedIconColor = TextSecondary,
+                                        unselectedTextColor = TextSecondary,
+                                        indicatorColor = CorporateBlue.copy(alpha = 0.12f)
                                     ),
                                     modifier = Modifier.testTag("tab_billing")
                                 )

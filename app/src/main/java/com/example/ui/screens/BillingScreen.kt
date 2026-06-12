@@ -22,6 +22,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import com.example.ui.components.PdfPrintUtil
 import com.example.data.ConstructionProject
 import com.example.data.PaymentRecord
 import com.example.ui.AppViewModel
@@ -84,9 +86,9 @@ fun BillingScreen(
 
                 Button(
                     onClick = { isAddingPayment = !isAddingPayment },
-                    colors = ButtonDefaults.buttonColors(containerColor = if (isAddingPayment) ColorError else LimeNeon),
+                    colors = ButtonDefaults.buttonColors(containerColor = if (isAddingPayment) ColorError else CorporateBlue),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    shape = SharpShapes.small,
+                    shape = SharpShapes.medium,
                     modifier = Modifier
                         .height(36.dp)
                         .testTag("add_payment_toggle")
@@ -94,7 +96,8 @@ fun BillingScreen(
                     Text(
                         text = if (isAddingPayment) "BATAL" else "INPUT BAYAR",
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (isAddingPayment) Color.White else Color.Black
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
                 }
             }
@@ -215,24 +218,22 @@ fun BillingScreen(
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .border(1.dp, if (paymentStatusSelected == "LUNAS") ColorSuccess else BorderGrey, SharpShapes.small)
-                                    .background(if (paymentStatusSelected == "LUNAS") ColorSuccess.copy(alpha = 0.1f) else MediumGrey)
+                                    .background(if (paymentStatusSelected == "LUNAS") ColorSuccess.copy(alpha = 0.15f) else MediumGrey, SharpShapes.medium)
                                     .clickable { paymentStatusSelected = "LUNAS" }
                                     .padding(10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("LUNAS", color = if (paymentStatusSelected == "LUNAS") ColorSuccess else TextSecondary, style = MaterialTheme.typography.labelLarge)
+                                Text("LUNAS", color = if (paymentStatusSelected == "LUNAS") ColorSuccess else TextSecondary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                             }
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .border(1.dp, if (paymentStatusSelected == "BELUM LUNAS") ColorPending else BorderGrey, SharpShapes.small)
-                                    .background(if (paymentStatusSelected == "BELUM LUNAS") ColorPending.copy(alpha = 0.1f) else MediumGrey)
+                                    .background(if (paymentStatusSelected == "BELUM LUNAS") ColorPending.copy(alpha = 0.15f) else MediumGrey, SharpShapes.medium)
                                     .clickable { paymentStatusSelected = "BELUM LUNAS" }
                                     .padding(10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("BELUM LUNAS", color = if (paymentStatusSelected == "BELUM LUNAS") ColorPending else TextSecondary, style = MaterialTheme.typography.labelLarge)
+                                Text("BELUM LUNAS", color = if (paymentStatusSelected == "BELUM LUNAS") ColorPending else TextSecondary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -257,14 +258,14 @@ fun BillingScreen(
                                     formMessage = "Harap isi semua kolom dengan benar!"
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = LimeNeon),
-                            shape = SharpShapes.small,
+                            colors = ButtonDefaults.buttonColors(containerColor = CorporateBlue),
+                            shape = SharpShapes.medium,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp)
                                 .testTag("submit_payment_button")
                         ) {
-                            Text("SIMPAN PEMBAYARAN", style = MaterialTheme.typography.labelSmall, color = Color.Black)
+                            Text("SIMPAN PEMBAYARAN", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = Color.White)
                         }
 
                         if (formMessage != null) {
@@ -295,7 +296,6 @@ fun BillingScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, BorderGrey, SharpShapes.medium)
                     .testTag("billing_card_${p.id}"),
                 colors = CardDefaults.cardColors(containerColor = DarkGrey),
                 shape = SharpShapes.medium
@@ -318,10 +318,10 @@ fun BillingScreen(
                         Text(
                             text = String.format("%.1f%% Progress", progressPercent),
                             style = MaterialTheme.typography.labelSmall,
-                            color = LimeNeonMuted,
+                            color = CorporateBlue,
                             modifier = Modifier
-                                .border(1.dp, BorderGrey, SharpShapes.small)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .background(MediumGrey, SharpShapes.small)
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
 
@@ -384,7 +384,7 @@ fun BillingScreen(
                     Button(
                         onClick = { activeInvoiceProject = p },
                         colors = ButtonDefaults.buttonColors(containerColor = CorporateBlue),
-                        shape = SharpShapes.small,
+                        shape = SharpShapes.medium,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(38.dp)
@@ -393,13 +393,14 @@ fun BillingScreen(
                         Icon(
                             imageVector = Icons.Default.ReceiptLong,
                             contentDescription = null,
-                            tint = Color.Black,
+                            tint = Color.White,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "BUAT INVOICE (REPLIKA FORMAL)",
-                            color = Color.Black,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
@@ -437,8 +438,7 @@ fun BillingScreen(
                 
                 Card(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, BorderGrey, SharpShapes.medium),
+                        .fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = DarkGrey),
                     shape = SharpShapes.medium
                 ) {
@@ -457,9 +457,8 @@ fun BillingScreen(
                             // Status Badge
                             Box(
                                 modifier = Modifier
-                                    .background(if (pay.status == "LUNAS") ColorSuccess.copy(alpha = 0.15f) else ColorPending.copy(alpha = 0.15f))
-                                    .border(1.dp, if (pay.status == "LUNAS") ColorSuccess else ColorPending, SharpShapes.small)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    .background(if (pay.status == "LUNAS") ColorSuccess.copy(alpha = 0.15f) else ColorPending.copy(alpha = 0.15f), SharpShapes.small)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
                                 Text(
                                     text = pay.status,
@@ -487,14 +486,102 @@ fun BillingScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         
                         Divider(color = BorderGrey)
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
-                        Text(text = "Raba/Keterangan: ${pay.notes}", style = MaterialTheme.typography.bodyMedium, color = Color.White)
-                        Text(
-                            text = "Tanggal: ${SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(pay.paymentDate))}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextSecondary
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = "Keterangan: ${pay.notes}", style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                                Text(
+                                    text = "Tanggal: ${SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(pay.paymentDate))}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary
+                                )
+                            }
+                            
+                            val printContext = LocalContext.current
+                            IconButton(
+                                onClick = {
+                                    var dpPercent = 100.0
+                                    var ppnPercent = 0.0
+                                    var poNo = "PO/GEN-${pay.id}"
+                                    if (pay.notes.startsWith("Invoice formal")) {
+                                        val dpRegex = "DP (\\d+\\.\\d+|\\d+)%".toRegex()
+                                        val dpMatch = dpRegex.find(pay.notes)
+                                        if (dpMatch != null) {
+                                            dpPercent = dpMatch.groupValues[1].toDoubleOrNull() ?: 100.0
+                                        }
+                                        val ppnRegex = "PPN (\\d+\\.\\d+|\\d+)%".toRegex()
+                                        val ppnMatch = ppnRegex.find(pay.notes)
+                                        if (ppnMatch != null) {
+                                            ppnPercent = ppnMatch.groupValues[1].toDoubleOrNull() ?: 0.0
+                                        }
+                                        val poRegex = "(?:untuk|for) PO ([\\w\\-/]+)".toRegex()
+                                        val poMatch = poRegex.find(pay.notes)
+                                        if (poMatch != null) {
+                                            poNo = poMatch.groupValues[1]
+                                        }
+                                    }
+                                    
+                                    val formattedDate = SimpleDateFormat("dd MMMM yyyy", Locale("id", "ID")).format(Date(pay.paymentDate))
+                                    val payDeliveries = deliveries.filter { it.projectId == pay.projectId && it.status == "SUKSES" }
+                                    
+                                    val items = if (payDeliveries.isEmpty()) {
+                                        val baseAmount = pay.amount / (1 + ppnPercent / 100.0) / (dpPercent / 100.0)
+                                        listOf(
+                                            InvoiceItem(
+                                                description = pay.notes,
+                                                quantity = 1.0,
+                                                unit = "Termin",
+                                                unitPrice = baseAmount
+                                            )
+                                        )
+                                    } else {
+                                        payDeliveries.map {
+                                            InvoiceItem(
+                                                description = it.materialType,
+                                                quantity = it.quantity,
+                                                unit = it.unit,
+                                                unitPrice = it.unitPrice
+                                            )
+                                        }
+                                    }
+                                    
+                                    val baseTotal = items.sumOf { it.total }
+                                    val calculatedDpVal = baseTotal * (dpPercent / 100.0)
+                                    val calculatedPpnVal = calculatedDpVal * (ppnPercent / 100.0)
+                                    
+                                    val html = generateInvoiceHtml(
+                                        invoiceNo = pay.invoiceNumber,
+                                        tanggal = formattedDate,
+                                        poNo = poNo,
+                                        kepadaYth = "PT. Cipta Karya Persada (Owner)",
+                                        lokasi = p?.location ?: "Lokasi Proyek",
+                                        items = items,
+                                        dpPercent = dpPercent,
+                                        dpVal = calculatedDpVal,
+                                        ppnPercent = ppnPercent,
+                                        ppnVal = calculatedPpnVal,
+                                        totalTagihan = pay.amount
+                                    )
+                                    PdfPrintUtil.printHtml(printContext, html, "Invoice_${pay.invoiceNumber.replace("/", "_")}")
+                                },
+                                modifier = Modifier
+                                    .background(MediumGrey, SharpShapes.small)
+                                    .size(36.dp)
+                                    .testTag("print_payment_invoice_${pay.id}")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Print,
+                                    contentDescription = "Cetak Invoice PDF",
+                                    tint = CorporateBlue,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
