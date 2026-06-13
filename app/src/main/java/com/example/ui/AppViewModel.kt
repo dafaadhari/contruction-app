@@ -78,10 +78,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 .filter { it.projectId == project.id && it.status == "LUNAS" }
                 .sumOf { it.amount }
 
+            // Total unpaid claims / terms (under BELUM LUNAS status)
+            val totalUnpaid = payList
+                .filter { it.projectId == project.id && it.status == "BELUM LUNAS" }
+                .sumOf { it.amount }
+
             project.id to ProjectFinancials(
                 project = project,
                 totalMaterialDeliveredValue = totalMaterial,
                 totalPaidValue = totalPaid,
+                totalUnpaidValue = totalUnpaid,
                 remainingBillingValue = maxOf(0.0, totalMaterial - totalPaid)
             )
         }
@@ -169,7 +175,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             projectCode = "PRJ-KMP-008",
             name = "Jembatan Sungai Kampar",
             location = "Kampar, Riau",
-            status = "SELESAI",
+            status = "SUKSES",
             contractValue = 3_200_000_000.0
         )
 
@@ -482,6 +488,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    fun updatePaymentStatus(paymentId: Int, newStatus: String) {
+        viewModelScope.launch {
+            payments.value.find { it.id == paymentId }?.let { original ->
+                repository.updatePayment(original.copy(status = newStatus))
+            }
+        }
+    }
+
+    fun deletePayment(payment: PaymentRecord) {
+        viewModelScope.launch {
+            repository.deletePayment(payment)
+        }
+    }
 }
 
 // Data holder classes for state streaming
@@ -489,6 +509,7 @@ data class ProjectFinancials(
     val project: ConstructionProject,
     val totalMaterialDeliveredValue: Double,
     val totalPaidValue: Double,
+    val totalUnpaidValue: Double,
     val remainingBillingValue: Double
 )
 

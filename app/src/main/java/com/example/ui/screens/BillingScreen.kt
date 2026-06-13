@@ -26,6 +26,8 @@ import androidx.compose.ui.platform.LocalContext
 import com.example.ui.components.PdfPrintUtil
 import com.example.data.ConstructionProject
 import com.example.data.PaymentRecord
+import com.example.data.LogisticsDelivery
+import androidx.compose.ui.window.Dialog
 import com.example.ui.AppViewModel
 import com.example.ui.ProjectFinancials
 import com.example.ui.screens.InvoiceCreatorScreen
@@ -240,22 +242,31 @@ fun BillingScreen(
                         Button(
                             onClick = {
                                 val proj = selectedProjectForPayment
-                                val amtVal = paymentAmountInput.toDoubleOrNull()
-                                if (proj != null && amtVal != null) {
+                                val cleanAmt = paymentAmountInput.replace("Rp", "")
+                                                                .replace("rp", "")
+                                                                .replace(".", "")
+                                                                .replace(",", "")
+                                                                .replace(" ", "")
+                                                                .trim()
+                                val amtVal = cleanAmt.toDoubleOrNull()
+                                if (proj != null && amtVal != null && amtVal > 0.0) {
                                     viewModel.addNewPayment(
                                         projectId = proj.id,
                                         amount = amtVal,
-                                        notes = paymentNotesInput,
+                                        notes = paymentNotesInput.trim(),
                                         status = paymentStatusSelected
                                     )
-                                    formMessage = "Klaim termin pembayaran berhasil dicatat."
+                                    formMessage = "Klaim termin pembayaran Rp ${String.format("%,.0f", amtVal)} berhasil dicatat."
                                     // reset
                                     paymentAmountInput = ""
                                     paymentNotesInput = ""
                                     selectedProjectForPayment = null
+                                    // Close form container
                                     isAddingPayment = false
+                                } else if (proj == null) {
+                                    formMessage = "Silakan pilih Proyek Klaim terlebih dahulu!"
                                 } else {
-                                    formMessage = "Harap isi semua kolom dengan benar!"
+                                    formMessage = "Nominal pembayaran harus diisi berupa angka positif!"
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = CorporateBlue),
@@ -272,7 +283,7 @@ fun BillingScreen(
                             Text(
                                 text = formMessage!!,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = LimeNeon,
+                                color = if (formMessage!!.contains("berhasil") || formMessage!!.contains("Rp")) LimeNeon else ColorError,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -293,9 +304,22 @@ fun BillingScreen(
 
         items(financialsMap.values.toList()) { financial ->
             val p = financial.project
+            var showDetailDialog by remember { mutableStateOf(false) }
+
+            if (showDetailDialog) {
+                ProjectBillingDetailDialog(
+                    financial = financial,
+                    allDeliveries = deliveries,
+                    allPayments = payments,
+                    viewModel = viewModel,
+                    onDismissRequest = { showDetailDialog = false }
+                )
+            }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { showDetailDialog = true }
                     .testTag("billing_card_${p.id}"),
                 colors = CardDefaults.cardColors(containerColor = DarkGrey),
                 shape = SharpShapes.medium
@@ -307,10 +331,17 @@ fun BillingScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(text = p.projectCode, style = MaterialTheme.typography.labelSmall, color = LimeNeon)
-                            Text(text = p.name, style = MaterialTheme.typography.titleLarge, color = Color.White)
+                            Text(
+                                text = p.name,
+                                style = MaterialTheme.typography.titleLarge,
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
+                        Spacer(modifier = Modifier.width(8.dp))
                         // Percentage progress metric based on Contract budget
                         val progressPercent = if (p.contractValue > 0) {
                             (financial.totalMaterialDeliveredValue / p.contractValue) * 100
@@ -319,6 +350,7 @@ fun BillingScreen(
                             text = String.format("%.1f%% Progress", progressPercent),
                             style = MaterialTheme.typography.labelSmall,
                             color = CorporateBlue,
+                            maxLines = 1,
                             modifier = Modifier
                                 .background(MediumGrey, SharpShapes.small)
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -356,6 +388,16 @@ fun BillingScreen(
                     ) {
                         Text(text = "JUMLAH SUDAH DIBAYAR:", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                         Text(text = "- ${formatRupiah(financial.totalPaidValue)}", style = MaterialTheme.typography.bodyMedium, color = ColorSuccess)
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(text = "TERMIN BELUM LUNAS:", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                        Text(text = formatRupiah(financial.totalUnpaidValue), style = MaterialTheme.typography.bodyMedium, color = ColorPending)
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -398,7 +440,7 @@ fun BillingScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "BUAT INVOICE (REPLIKA FORMAL)",
+                            text = "CETAK INVOICE",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.labelSmall
@@ -626,9 +668,434 @@ fun BillingScreen(
                     status = if (isSettled) "LUNAS" else "BELUM LUNAS",
                     invoiceNo = invoiceNo
                 )
+                activeInvoiceProject = null
             },
             modifier = Modifier.fillMaxSize()
         )
     }
 }
+}
+
+@Composable
+fun ProjectBillingDetailDialog(
+    financial: ProjectFinancials,
+    allDeliveries: List<LogisticsDelivery>,
+    allPayments: List<PaymentRecord>,
+    viewModel: AppViewModel,
+    onDismissRequest: () -> Unit
+) {
+    val p = financial.project
+    val projectDeliveries = remember(allDeliveries) {
+        allDeliveries.filter { it.projectId == p.id }
+    }
+    val projectPayments = remember(allPayments) {
+        allPayments.filter { it.projectId == p.id }
+    }
+
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.85f),
+            shape = SharpShapes.medium,
+            color = DarkGrey
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .fillMaxSize()
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "RINCIAN KEUANGAN MASTER PROYEK",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LimeNeon
+                        )
+                        Text(
+                            text = p.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    IconButton(onClick = onDismissRequest) {
+                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = Color.LightGray)
+                    }
+                }
+
+                Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 12.dp))
+
+                // Scrollable content containing summary and list logs
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Summary section
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MediumGrey),
+                            shape = SharpShapes.small
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    text = "RINGKASAN BUDGET",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = LimeNeon,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                
+                                DetailBillingRow(label = "Kode / Wilayah", value = "${p.projectCode} • ${p.location}")
+                                DetailBillingRow(label = "Status Proyek", value = p.status, valueColor = if (p.status == "AKTIF") ColorSuccess else TextSecondary)
+                                DetailBillingRow(label = "Nilai Kontrak", value = formatRupiah(p.contractValue))
+                                DetailBillingRow(label = "Total Mat. Sukses", value = formatRupiah(financial.totalMaterialDeliveredValue))
+                                DetailBillingRow(label = "Sudah Dibayar (Lunas)", value = "- ${formatRupiah(financial.totalPaidValue)}", valueColor = ColorSuccess)
+                                DetailBillingRow(label = "Termin Belum Lunas", value = formatRupiah(financial.totalUnpaidValue), valueColor = ColorPending)
+                                
+                                Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 4.dp))
+                                
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "SISA PENAGIHAN",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondary,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = formatRupiah(financial.remainingBillingValue),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = LimeNeon,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Deliveries Lists
+                    item {
+                        Column {
+                            Text(
+                                text = "LOGISTIK PENGIRIMAN MATERIAL (${projectDeliveries.size})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                                letterSpacing = 0.5.sp
+                            )
+
+                            if (projectDeliveries.isEmpty()) {
+                                Text(
+                                    text = "Belum ada pengiriman material untuk proyek ini.",
+                                    color = TextSecondary,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            } else {
+                                projectDeliveries.forEach { del ->
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MediumGrey.copy(alpha = 0.5f)),
+                                        shape = SharpShapes.small
+                                    ) {
+                                        Column(modifier = Modifier.padding(10.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(text = del.suratJalanNumber, style = MaterialTheme.typography.labelSmall, color = LimeNeon)
+                                                Box(
+                                                    modifier = Modifier
+                                                        .background(if (del.status == "SUKSES") ColorSuccess.copy(alpha = 0.15f) else ColorPending.copy(alpha = 0.15f))
+                                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                ) {
+                                                    Text(
+                                                        text = del.status,
+                                                        color = if (del.status == "SUKSES") ColorSuccess else ColorPending,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontSize = 8.sp
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(text = del.materialType, style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    text = "${del.quantity} ${del.unit} x ${formatRupiah(del.unitPrice)}",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = TextSecondary
+                                                )
+                                                Text(
+                                                    text = formatRupiah(del.quantity * del.unitPrice),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = Color.White,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Payments Lists
+                    item {
+                        Column {
+                            Text(
+                                text = "RIWAYAT TAGIHAN & PEMBAYARAN KLIEN (${projectPayments.size})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                                letterSpacing = 0.5.sp
+                            )
+
+                            if (projectPayments.isEmpty()) {
+                                Text(
+                                    text = "Belum ada tagihan atau pembayaran yang dicatat.",
+                                    color = TextSecondary,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            } else {
+                                projectPayments.forEach { pay ->
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        colors = CardDefaults.cardColors(containerColor = MediumGrey.copy(alpha = 0.5f)),
+                                        shape = SharpShapes.small
+                                    ) {
+                                        Column(modifier = Modifier.padding(10.dp)) {
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(text = pay.invoiceNumber, style = MaterialTheme.typography.labelSmall, color = CorporateBlue)
+                                                Box(
+                                                    modifier = Modifier
+                                                        .background(if (pay.status == "LUNAS") ColorSuccess.copy(alpha = 0.15f) else ColorPending.copy(alpha = 0.15f))
+                                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                                ) {
+                                                    Text(
+                                                        text = pay.status,
+                                                        color = if (pay.status == "LUNAS") ColorSuccess else ColorPending,
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontSize = 8.sp
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(text = pay.notes, style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                val payDate = SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(pay.paymentDate))
+                                                Text(
+                                                    text = payDate,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = TextSecondary
+                                                )
+                                                Text(
+                                                    text = formatRupiah(pay.amount),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = if (pay.status == "LUNAS") ColorSuccess else ColorPending,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.height(10.dp))
+                                            Divider(color = BorderGrey.copy(alpha = 0.5f))
+                                            Spacer(modifier = Modifier.height(6.dp))
+
+                                            // EDIT DATA & ACTION CONTROLS FOR THIS TRANSACTION
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                if (pay.status == "BELUM LUNAS") {
+                                                    // Opsi Penyelesaian Pembayaran jadi LUNAS
+                                                    Button(
+                                                        onClick = { viewModel.updatePaymentStatus(pay.id, "LUNAS") },
+                                                        colors = ButtonDefaults.buttonColors(containerColor = ColorSuccess),
+                                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                        shape = SharpShapes.small,
+                                                        modifier = Modifier.weight(1.2f).height(32.dp).testTag("set_lunas_${pay.id}")
+                                                    ) {
+                                                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("SET LUNAS", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                    }
+                                                }
+
+                                                val printContext = LocalContext.current
+                                                Button(
+                                                    onClick = {
+                                                        val notesParts = pay.notes.split(" | ITEMS: ")
+                                                        val cleanNotes = notesParts.first()
+                                                        val serializedItems = if (notesParts.size > 1) notesParts[1] else null
+                                                        
+                                                        var dpPercent = 100.0
+                                                        var ppnPercent = 0.0
+                                                        var poNo = "PO/GEN-${pay.id}"
+                                                        if (cleanNotes.startsWith("Invoice formal")) {
+                                                            val dpRegex = "DP (\\d+\\.\\d+|\\d+)%".toRegex()
+                                                            val dpMatch = dpRegex.find(cleanNotes)
+                                                            if (dpMatch != null) {
+                                                                dpPercent = dpMatch.groupValues[1].toDoubleOrNull() ?: 100.0
+                                                            }
+                                                            val ppnRegex = "PPN (\\d+\\.\\d+|\\d+)%".toRegex()
+                                                            val ppnMatch = ppnRegex.find(cleanNotes)
+                                                            if (ppnMatch != null) {
+                                                                ppnPercent = ppnMatch.groupValues[1].toDoubleOrNull() ?: 0.0
+                                                            }
+                                                            val poRegex = "(?:untuk|for) PO ([\\w\\-/]+)".toRegex()
+                                                            val poMatch = poRegex.find(cleanNotes)
+                                                            if (poMatch != null) {
+                                                                poNo = poMatch.groupValues[1]
+                                                            }
+                                                        }
+                                                        
+                                                        val formattedDate = SimpleDateFormat("dd MMMM yyyy", Locale("id", "ID")).format(Date(pay.paymentDate))
+                                                        val payDeliveries = allDeliveries.filter { it.projectId == pay.projectId && it.status == "SUKSES" }
+                                                        
+                                                        val items = if (!serializedItems.isNullOrBlank()) {
+                                                            serializedItems.split(";").mapNotNull { itemStr ->
+                                                                val fields = itemStr.split(":")
+                                                                if (fields.size >= 4) {
+                                                                    InvoiceItem(
+                                                                        description = fields[0],
+                                                                        quantity = fields[1].toDoubleOrNull() ?: 1.0,
+                                                                        unit = fields[2],
+                                                                        unitPrice = fields[3].toDoubleOrNull() ?: 0.0
+                                                                    )
+                                                                } else {
+                                                                    null
+                                                                }
+                                                            }
+                                                        } else {
+                                                            if (cleanNotes.startsWith("Invoice formal") && payDeliveries.isNotEmpty()) {
+                                                                payDeliveries.map {
+                                                                    InvoiceItem(
+                                                                        description = it.materialType,
+                                                                        quantity = it.quantity,
+                                                                        unit = it.unit,
+                                                                        unitPrice = it.unitPrice
+                                                                    )
+                                                                }
+                                                            } else {
+                                                                val baseAmount = pay.amount / (1 + ppnPercent / 100.0) / (dpPercent / 100.0)
+                                                                listOf(
+                                                                    InvoiceItem(
+                                                                        description = cleanNotes,
+                                                                        quantity = 1.0,
+                                                                        unit = "Termin",
+                                                                        unitPrice = baseAmount
+                                                                    )
+                                                                )
+                                                            }
+                                                        }
+                                                        
+                                                        val baseTotal = items.sumOf { it.total }
+                                                        val calculatedDpVal = baseTotal * (dpPercent / 100.0)
+                                                        val calculatedPpnVal = calculatedDpVal * (ppnPercent / 100.0)
+                                                        
+                                                        val html = generateInvoiceHtml(
+                                                            invoiceNo = pay.invoiceNumber,
+                                                            tanggal = formattedDate,
+                                                            poNo = poNo,
+                                                            kepadaYth = "PT. Cipta Karya Persada (Owner)",
+                                                            lokasi = p.location,
+                                                            items = items,
+                                                            dpPercent = dpPercent,
+                                                            dpVal = calculatedDpVal,
+                                                            ppnPercent = ppnPercent,
+                                                            ppnVal = calculatedPpnVal,
+                                                            totalTagihan = pay.amount
+                                                        )
+                                                        PdfPrintUtil.printHtml(printContext, html, "Invoice_${pay.invoiceNumber.replace("/", "_")}")
+                                                    },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = CorporateBlue),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                    shape = SharpShapes.small,
+                                                    modifier = Modifier.weight(1f).height(32.dp).testTag("print_detail_${pay.id}")
+                                                ) {
+                                                    Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("CETAK", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                }
+
+                                                // Hapus Tagihan/Pembayaran
+                                                Button(
+                                                    onClick = { viewModel.deletePayment(pay) },
+                                                    colors = ButtonDefaults.buttonColors(containerColor = ColorError),
+                                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                    shape = SharpShapes.small,
+                                                    modifier = Modifier.weight(1f).height(32.dp).testTag("delete_pay_${pay.id}")
+                                                ) {
+                                                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text("HAPUS", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = onDismissRequest,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = CorporateBlue),
+                    shape = SharpShapes.small
+                ) {
+                    Text("OK, KEMBALI", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DetailBillingRow(
+    label: String,
+    value: String,
+    valueColor: Color = Color.White
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+        Text(text = value, style = MaterialTheme.typography.bodyMedium, color = valueColor, fontWeight = FontWeight.SemiBold)
+    }
 }

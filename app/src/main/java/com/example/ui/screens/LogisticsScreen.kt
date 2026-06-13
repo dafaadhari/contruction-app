@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,9 +15,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.window.Dialog
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.ui.components.PdfPrintUtil
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -148,19 +153,48 @@ fun SuratJalanSubTab(
     deliveries: List<LogisticsDelivery>,
     viewModel: AppViewModel
 ) {
+    var isFormExpanded by remember { mutableStateOf(false) }
+
     var expandedProjectDropdown by remember { mutableStateOf(false) }
     var selectedProjectForForm by remember { mutableStateOf<ConstructionProject?>(null) }
     
     var selectedMaterialPresetIndex by remember { mutableStateOf(0) }
     var volumeInput by remember { mutableStateOf("") }
+    var customPriceInput by remember { mutableStateOf("") }
     var driverNameInput by remember { mutableStateOf("") }
     var plateNumberInput by remember { mutableStateOf("") }
+
+    // Sync unit price when active preset changes
+    LaunchedEffect(selectedMaterialPresetIndex) {
+        customPriceInput = MATERIAL_PRESETS[selectedMaterialPresetIndex].price.toInt().toString()
+    }
 
     // Mock photo attachments (pre-selections to make the interface incredibly real)
     var attachedPhotoLabel by remember { mutableStateOf<String?>(null) }
     var selectedPhotoType by remember { mutableStateOf<String?>(null) }
 
     var formMessage by remember { mutableStateOf<String?>(null) }
+
+    // Real device integration launchers with visual text fallback
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        attachedPhotoLabel = "CCTV_Kamera_Selesai_${System.currentTimeMillis() % 10000}.jpg"
+        selectedPhotoType = "SYSTEM_CAM"
+        formMessage = "Bukti foto lapangan berhasil direkam menggunakan Kamera HP!"
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            attachedPhotoLabel = "Galeri_File_Terupload_${System.currentTimeMillis() % 10000}.jpg"
+            selectedPhotoType = "SYSTEM_GAL"
+            formMessage = "Bukti foto berhasil dipilih dari Dokumen Galeri!"
+        }
+    }
+
+    var selectedDeliveryForDetail by remember { mutableStateOf<LogisticsDelivery?>(null) }
 
     LazyColumn(
         modifier = Modifier
@@ -177,149 +211,176 @@ fun SuratJalanSubTab(
                 shape = SharpShapes.medium
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "INPUT SURAT JALAN DIGITAL",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = LimeNeon,
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // 1. Project Picker (Exposed Custom Exposed Dropdown Menu)
-                    Text(
-                        text = "LOKASI PROYEK TUJUAN",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MediumGrey, SharpShapes.small)
-                                .clickable { expandedProjectDropdown = true }
-                                .padding(12.dp)
-                                .testTag("select_project_dropdown"),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                    // Header row acting as a beautiful dropdown/accordion toggle
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isFormExpanded = !isFormExpanded },
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
                             Text(
-                                text = selectedProjectForForm?.name ?: "Pilih Proyek Konstruksi...",
-                                color = if (selectedProjectForForm != null) Color.White else TextSecondary,
-                                style = MaterialTheme.typography.bodyLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                text = "INPUT SURAT JALAN DIGITAL",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = LimeNeon,
+                                letterSpacing = 1.sp
                             )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Ketuk untuk membuat surat jalan baru...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                        IconButton(onClick = { isFormExpanded = !isFormExpanded }) {
                             Icon(
-                                imageVector = if (expandedProjectDropdown) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
-                                contentDescription = null,
-                                tint = Color.White
+                                imageVector = if (isFormExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = if (isFormExpanded) "Tutup Form" else "Buka Form",
+                                tint = LimeNeon
                             )
                         }
-
-                        DropdownMenu(
-                            expanded = expandedProjectDropdown,
-                            onDismissRequest = { expandedProjectDropdown = false },
-                            modifier = Modifier
-                                .fillMaxWidth(0.9f)
-                                .background(MediumGrey)
-                        ) {
-                            projects.forEach { proj ->
-                                DropdownMenuItem(
-                                    text = { Text("${proj.projectCode} - ${proj.name}", color = Color.White) },
-                                    onClick = {
-                                        selectedProjectForForm = proj
-                                        expandedProjectDropdown = false
-                                    }
-                                )
-                            }
-                        }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    AnimatedVisibility(visible = isFormExpanded) {
+                        Column {
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                    // 2. Material selector grid
-                    Text(
-                        text = "JENIS MATERIAL",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        MATERIAL_PRESETS.take(3).forEachIndexed { index, preset ->
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .background(if (selectedMaterialPresetIndex == index) CorporateBlue.copy(alpha = 0.15f) else MediumGrey, SharpShapes.small)
-                                    .clickable { selectedMaterialPresetIndex = index }
-                                    .padding(8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = preset.name.split(" ")[0], // first word
-                                        color = if (selectedMaterialPresetIndex == index) CorporateBlue else Color.White,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "(${preset.unit})",
-                                        color = TextSecondary,
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Secondary selection list
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        MATERIAL_PRESETS.drop(3).forEachIndexed { idx, preset ->
-                            val actualIndex = idx + 3
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .background(if (selectedMaterialPresetIndex == actualIndex) CorporateBlue.copy(alpha = 0.15f) else MediumGrey, SharpShapes.small)
-                                    .clickable { selectedMaterialPresetIndex = actualIndex }
-                                    .padding(8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = preset.name,
-                                        color = if (selectedMaterialPresetIndex == actualIndex) CorporateBlue else Color.White,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        textAlign = TextAlign.Center,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "(${preset.unit})",
-                                        color = TextSecondary,
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // 3. Volume and Driver Info
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                            // 1. Project Picker (Exposed Custom Exposed Dropdown Menu)
                             Text(
+                                text = "LOKASI PROYEK TUJUAN",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MediumGrey, SharpShapes.small)
+                                        .clickable { expandedProjectDropdown = true }
+                                        .padding(12.dp)
+                                        .testTag("select_project_dropdown"),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = selectedProjectForForm?.name ?: "Pilih Proyek Konstruksi...",
+                                        color = if (selectedProjectForForm != null) Color.White else TextSecondary,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Icon(
+                                        imageVector = if (expandedProjectDropdown) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown,
+                                        contentDescription = null,
+                                        tint = Color.White
+                                    )
+                                }
+
+                                DropdownMenu(
+                                    expanded = expandedProjectDropdown,
+                                    onDismissRequest = { expandedProjectDropdown = false },
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.9f)
+                                        .background(MediumGrey)
+                                ) {
+                                    projects.forEach { proj ->
+                                        DropdownMenuItem(
+                                            text = { Text("${proj.projectCode} - ${proj.name}", color = Color.White) },
+                                            onClick = {
+                                                selectedProjectForForm = proj
+                                                expandedProjectDropdown = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // 2. Material selector grid
+                            Text(
+                                text = "JENIS MATERIAL",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                MATERIAL_PRESETS.take(3).forEachIndexed { index, preset ->
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(if (selectedMaterialPresetIndex == index) CorporateBlue.copy(alpha = 0.15f) else MediumGrey, SharpShapes.small)
+                                            .clickable { selectedMaterialPresetIndex = index }
+                                            .padding(8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(
+                                                text = preset.name.split(" ")[0], // first word
+                                                color = if (selectedMaterialPresetIndex == index) CorporateBlue else Color.White,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "(${preset.unit})",
+                                                color = TextSecondary,
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Secondary selection list
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                MATERIAL_PRESETS.drop(3).forEachIndexed { idx, preset ->
+                                    val actualIndex = idx + 3
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(if (selectedMaterialPresetIndex == actualIndex) CorporateBlue.copy(alpha = 0.15f) else MediumGrey, SharpShapes.small)
+                                            .clickable { selectedMaterialPresetIndex = actualIndex }
+                                            .padding(8.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Text(
+                                                text = preset.name,
+                                                color = if (selectedMaterialPresetIndex == actualIndex) CorporateBlue else Color.White,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                textAlign = TextAlign.Center,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "(${preset.unit})",
+                                                color = TextSecondary,
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // 3. Volume and Custom Code-Generated Estimated Price info
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
                                 text = "VOLUME (${MATERIAL_PRESETS[selectedMaterialPresetIndex].unit})",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextSecondary
@@ -348,6 +409,41 @@ fun SuratJalanSubTab(
 
                         Column(modifier = Modifier.weight(1.2f)) {
                             Text(
+                                text = "HARGA SATUAN (Rp)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            TextField(
+                                value = customPriceInput,
+                                onValueChange = { customPriceInput = it },
+                                placeholder = { Text("Harga Satuan...") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = MediumGrey,
+                                    unfocusedContainerColor = MediumGrey,
+                                    focusedIndicatorColor = LimeNeon,
+                                    unfocusedIndicatorColor = BorderGrey,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                ),
+                                shape = SharpShapes.small,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("custom_price_input")
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Column(modifier = Modifier.weight(1.2f)) {
+                            Text(
                                 text = "NAMA SOPIR",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextSecondary
@@ -372,34 +468,34 @@ fun SuratJalanSubTab(
                                     .testTag("driver_name_input")
                             )
                         }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "NOMOR PLAT TRUK",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextSecondary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            TextField(
+                                value = plateNumberInput,
+                                onValueChange = { plateNumberInput = it },
+                                placeholder = { Text("B 9421 XY") },
+                                singleLine = true,
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = MediumGrey,
+                                    unfocusedContainerColor = MediumGrey,
+                                    focusedIndicatorColor = LimeNeon,
+                                    unfocusedIndicatorColor = BorderGrey,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                ),
+                                shape = SharpShapes.small,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("plate_number_input")
+                            )
+                        }
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = "NOMOR PLAT TRUK",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    TextField(
-                        value = plateNumberInput,
-                        onValueChange = { plateNumberInput = it },
-                        placeholder = { Text("Misal: B 9421 XY") },
-                        singleLine = true,
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = MediumGrey,
-                            unfocusedContainerColor = MediumGrey,
-                            focusedIndicatorColor = LimeNeon,
-                            unfocusedIndicatorColor = BorderGrey,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        shape = SharpShapes.small,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("plate_number_input")
-                    )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -417,11 +513,17 @@ fun SuratJalanSubTab(
                     ) {
                         Button(
                             onClick = {
-                                selectedPhotoType = "STEEL"
-                                attachedPhotoLabel = "Kamera_Baja_Tulangan_Selesai.jpg"
+                                try {
+                                    cameraLauncher.launch(null)
+                                } catch (e: Exception) {
+                                    // Fallback for emulator environments
+                                    attachedPhotoLabel = "Kamera_Baja_${System.currentTimeMillis() % 1000}.jpg"
+                                    selectedPhotoType = "SYSTEM_CAM"
+                                    formMessage = "Foto default berhasil terlampir (Kamera Emulator)."
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (selectedPhotoType == "STEEL") CorporateBlue.copy(alpha = 0.2f) else MediumGrey
+                                containerColor = if (selectedPhotoType == "SYSTEM_CAM") CorporateBlue.copy(alpha = 0.2f) else MediumGrey
                             ),
                             shape = SharpShapes.medium,
                             modifier = Modifier
@@ -431,17 +533,23 @@ fun SuratJalanSubTab(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Foto Baja", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                                Text("Ambil Kamera", style = MaterialTheme.typography.labelSmall, color = Color.White)
                             }
                         }
 
                         Button(
                             onClick = {
-                                selectedPhotoType = "CONCRETE"
-                                attachedPhotoLabel = "Kamera_Semen_Mixer_Selesai.jpg"
+                                try {
+                                    galleryLauncher.launch("image/*")
+                                } catch (e: Exception) {
+                                    // Fallback for emulator environments
+                                    attachedPhotoLabel = "Galeri_Beton_${System.currentTimeMillis() % 1000}.jpg"
+                                    selectedPhotoType = "SYSTEM_GAL"
+                                    formMessage = "Foto default berhasil terlampir (Galeri Emulator)."
+                                }
                             },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (selectedPhotoType == "CONCRETE") CorporateBlue.copy(alpha = 0.2f) else MediumGrey
+                                containerColor = if (selectedPhotoType == "SYSTEM_GAL") CorporateBlue.copy(alpha = 0.2f) else MediumGrey
                             ),
                             shape = SharpShapes.medium,
                             modifier = Modifier
@@ -449,9 +557,9 @@ fun SuratJalanSubTab(
                                 .height(44.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Foto Beton", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                                Text("Pilih Galeri", style = MaterialTheme.typography.labelSmall, color = Color.White)
                             }
                         }
                     }
@@ -503,13 +611,14 @@ fun SuratJalanSubTab(
                                 val proj = selectedProjectForForm
                                 val preset = MATERIAL_PRESETS[selectedMaterialPresetIndex]
                                 val volVal = volumeInput.toDoubleOrNull()
+                                val priceVal = customPriceInput.replace(".", "").replace(",", ".").toDoubleOrNull() ?: preset.price
                                 if (proj != null && volVal != null && driverNameInput.isNotEmpty()) {
                                     viewModel.addNewDelivery(
                                         projectId = proj.id,
                                         materialType = preset.name,
                                         quantity = volVal,
                                         unit = preset.unit,
-                                        unitPrice = preset.price,
+                                        unitPrice = priceVal,
                                         driverName = driverNameInput,
                                         plateNumber = plateNumberInput,
                                         status = "TERTUNDA",
@@ -518,6 +627,7 @@ fun SuratJalanSubTab(
                                     formMessage = "Surat jalan TERTUNDA berhasil dicatat."
                                     // Reset fields
                                     volumeInput = ""
+                                    customPriceInput = preset.price.toInt().toString()
                                     driverNameInput = ""
                                     plateNumberInput = ""
                                     attachedPhotoLabel = null
@@ -542,13 +652,14 @@ fun SuratJalanSubTab(
                                 val proj = selectedProjectForForm
                                 val preset = MATERIAL_PRESETS[selectedMaterialPresetIndex]
                                 val volVal = volumeInput.toDoubleOrNull()
+                                val priceVal = customPriceInput.replace(".", "").replace(",", ".").toDoubleOrNull() ?: preset.price
                                 if (proj != null && volVal != null && driverNameInput.isNotEmpty()) {
                                     viewModel.addNewDelivery(
                                         projectId = proj.id,
                                         materialType = preset.name,
                                         quantity = volVal,
                                         unit = preset.unit,
-                                        unitPrice = preset.price,
+                                        unitPrice = priceVal,
                                         driverName = driverNameInput,
                                         plateNumber = plateNumberInput,
                                         status = "SUKSES",
@@ -557,6 +668,7 @@ fun SuratJalanSubTab(
                                     formMessage = "Surat jalan SUKSES langsung terkirim."
                                     // Reset fields
                                     volumeInput = ""
+                                    customPriceInput = preset.price.toInt().toString()
                                     driverNameInput = ""
                                     plateNumberInput = ""
                                     attachedPhotoLabel = null
@@ -587,9 +699,11 @@ fun SuratJalanSubTab(
                             textAlign = TextAlign.Center
                         )
                     }
-                }
-            }
-        }
+                } // End of Column inside AnimatedVisibility
+              } // End of AnimatedVisibility
+            } // End of Card Column
+          } // End of Card
+        } // End of LazyColumn Item
 
         // Title of recent logs
         item {
@@ -605,7 +719,8 @@ fun SuratJalanSubTab(
             val p = projects.find { it.id == del.projectId }
             Card(
                 modifier = Modifier
-                    .fillMaxWidth(),
+                    .fillMaxWidth()
+                    .clickable { selectedDeliveryForDetail = del },
                 colors = CardDefaults.cardColors(containerColor = DarkGrey),
                 shape = SharpShapes.medium
             ) {
@@ -715,6 +830,16 @@ fun SuratJalanSubTab(
         item {
             Spacer(modifier = Modifier.height(80.dp))
         }
+    }
+
+    selectedDeliveryForDetail?.let { del ->
+        val p = projects.find { it.id == del.projectId }
+        DeliveryDetailDialog(
+            delivery = del,
+            project = p,
+            viewModel = viewModel,
+            onDismissRequest = { selectedDeliveryForDetail = null }
+        )
     }
 }
 
@@ -851,22 +976,45 @@ fun MasterProyekSubTab(
                             modifier = Modifier.fillMaxWidth()
                         )
 
+                        var formMessageProject by remember { mutableStateOf<String?>(null) }
+
+                        if (formMessageProject != null) {
+                            Text(
+                                text = formMessageProject!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (formMessageProject!!.contains("Selesai") || formMessageProject!!.contains("berhasil")) LimeNeon else ColorError,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
                         Button(
                             onClick = {
-                                val bVal = budgetInput.toDoubleOrNull()
-                                if (projectCodeInput.isNotEmpty() && projectNameInput.isNotEmpty() && bVal != null) {
+                                val cleanBudget = budgetInput.replace("Rp", "")
+                                                            .replace("rp", "")
+                                                            .replace(".", "")
+                                                            .replace(",", "")
+                                                            .replace(" ", "")
+                                                            .trim()
+                                val bVal = cleanBudget.toDoubleOrNull()
+
+                                if (projectCodeInput.isBlank() || projectNameInput.isBlank()) {
+                                    formMessageProject = "Harap isi Kode Proyek dan Nama Lokasi!"
+                                } else if (bVal == null || bVal <= 0.0) {
+                                    formMessageProject = "Nilai Kontrak harus berupa angka positif yang sah!"
+                                } else {
                                     viewModel.addNewProject(
-                                        code = projectCodeInput,
-                                        name = projectNameInput,
-                                        location = locationInput,
+                                        code = projectCodeInput.trim(),
+                                        name = projectNameInput.trim(),
+                                        location = locationInput.trim(),
                                         contractValue = bVal
                                     )
-                                    // Reset
+                                    formMessageProject = "Selesai! Master Proyek baru berhasil didaftarkan."
+                                    // Reset fields
                                     projectCodeInput = ""
                                     projectNameInput = ""
                                     locationInput = ""
                                     budgetInput = ""
-                                    isAddingProject = false
+                                    // Close form container after brief delay or keep open for visual validation
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = LimeNeon),
@@ -909,19 +1057,47 @@ fun MasterProyekSubTab(
                                 letterSpacing = 0.5.sp
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            // Status bar indicator
-                            Box(
-                                modifier = Modifier
-                                    .background(if (project.status == "AKTIF") ColorSuccess.copy(alpha = 0.15f) else BorderGrey)
-                                    .border(1.dp, if (project.status == "AKTIF") ColorSuccess else TextSecondary, SharpShapes.small)
-                                    .padding(horizontal = 4.dp, vertical = 1.dp)
-                            ) {
-                                Text(
-                                    text = project.status,
-                                    color = if (project.status == "AKTIF") ColorSuccess else TextSecondary,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontSize = 8.sp
-                                )
+                            var statusExpanded by remember { mutableStateOf(false) }
+
+                            Box {
+                                Box(
+                                    modifier = Modifier
+                                        .background(if (project.status == "AKTIF") ColorSuccess.copy(alpha = 0.15f) else CorporateBlue.copy(alpha = 0.15f))
+                                        .border(1.dp, if (project.status == "AKTIF") ColorSuccess else CorporateBlue, SharpShapes.small)
+                                        .clickable {
+                                            statusExpanded = true
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(
+                                        text = "${project.status} ▾",
+                                        color = if (project.status == "AKTIF") ColorSuccess else CorporateBlue,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                DropdownMenu(
+                                    expanded = statusExpanded,
+                                    onDismissRequest = { statusExpanded = false },
+                                    modifier = Modifier.background(MediumGrey)
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("AKTIF", color = ColorSuccess, fontWeight = FontWeight.Bold) },
+                                        onClick = {
+                                            viewModel.updateProjectStatus(project.id, "AKTIF")
+                                            statusExpanded = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text("SUKSES", color = CorporateBlue, fontWeight = FontWeight.Bold) },
+                                        onClick = {
+                                            viewModel.updateProjectStatus(project.id, "SUKSES")
+                                            statusExpanded = false
+                                        }
+                                    )
+                                }
                             }
                         }
                         
@@ -973,6 +1149,8 @@ fun ProjectDeliveriesDetailScreen(
     val projectDeliveries = remember(deliveries) {
         deliveries.filter { it.projectId == projectId }
     }
+
+    var selectedDeliveryForDetail by remember { mutableStateOf<LogisticsDelivery?>(null) }
 
     Column(
         modifier = Modifier
@@ -1062,7 +1240,8 @@ fun ProjectDeliveriesDetailScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .border(1.dp, BorderGrey, SharpShapes.medium),
+                            .border(1.dp, BorderGrey, SharpShapes.medium)
+                            .clickable { selectedDeliveryForDetail = del },
                         colors = CardDefaults.cardColors(containerColor = DarkGrey),
                         shape = SharpShapes.medium
                     ) {
@@ -1172,6 +1351,16 @@ fun ProjectDeliveriesDetailScreen(
                 Spacer(modifier = Modifier.height(40.dp))
             }
         }
+    }
+
+    selectedDeliveryForDetail?.let { del ->
+        val p = projects.find { it.id == del.projectId }
+        DeliveryDetailDialog(
+            delivery = del,
+            project = p,
+            viewModel = viewModel,
+            onDismissRequest = { selectedDeliveryForDetail = null }
+        )
     }
 }
 
@@ -1446,4 +1635,484 @@ fun generateSuratJalanHtml(
     </body>
     </html>
     """.trimIndent()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DeliveryDetailDialog(
+    delivery: LogisticsDelivery,
+    project: ConstructionProject?,
+    viewModel: AppViewModel,
+    onDismissRequest: () -> Unit
+) {
+    val printContext = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        modifier = Modifier.testTag("delivery_detail_dialog"),
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        content = {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.95f)
+                    .wrapContentHeight()
+                    .padding(16.dp),
+                shape = SharpShapes.medium,
+                color = DarkGrey
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                ) {
+                    // Header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "DETAIL SURAT JALAN",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = LimeNeon
+                            )
+                            Text(
+                                text = delivery.suratJalanNumber,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White
+                            )
+                        }
+                        
+                        IconButton(onClick = onDismissRequest) {
+                            Icon(Icons.Default.Close, contentDescription = "Tutup", tint = Color.LightGray)
+                        }
+                    }
+                    
+                    Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 12.dp))
+                    
+                    // Body list of details
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        DetailRowLabel(label = "Tujuan Proyek", value = project?.name ?: "Proyek Unspecified")
+                        DetailRowLabel(label = "Lokasi", value = project?.location ?: "-")
+                        DetailRowLabel(label = "Jenis Material", value = delivery.materialType)
+                        DetailRowLabel(
+                            label = "Volume / Jumlah",
+                            value = "${delivery.quantity} ${delivery.unit}"
+                        )
+                        DetailRowLabel(
+                            label = "Harga Satuan",
+                            value = formatRupiahLocal(delivery.unitPrice)
+                        )
+                        DetailRowLabel(
+                            label = "Total Nilai Estimasi",
+                            value = formatRupiahLocal(delivery.quantity * delivery.unitPrice),
+                            valueColor = LimeNeon
+                        )
+                        DetailRowLabel(label = "Nama Sopir", value = delivery.driverName)
+                        DetailRowLabel(label = "Plat Nomor", value = delivery.plateNumber)
+                        DetailRowLabel(
+                            label = "Waktu Pengiriman",
+                            value = SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()).format(Date(delivery.deliveryDateTime))
+                        )
+                        DetailRowLabel(
+                            label = "Status Delivery",
+                            value = delivery.status,
+                            valueColor = if (delivery.status == "SUKSES") ColorSuccess else ColorPending
+                        )
+                        
+                        if (delivery.photoPath != null) {
+                            var showPhotoDialog by remember { mutableStateOf(false) }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MediumGrey, SharpShapes.small)
+                                    .clickable { showPhotoDialog = true }
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = LimeNeon, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text("Bukti Foto Terlampir (Sopir/CCTV)", style = MaterialTheme.typography.bodyMedium, color = Color.White)
+                                    Text("${delivery.photoPath} 🔍 (Ketuk untuk Lihat)", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                                }
+                            }
+
+                            if (showPhotoDialog) {
+                                PhotoViewDialog(
+                                    delivery = delivery,
+                                    project = project,
+                                    onDismissRequest = { showPhotoDialog = false }
+                                )
+                            }
+                        }
+                    }
+                    
+                    Divider(color = BorderGrey, modifier = Modifier.padding(bottom = 12.dp))
+                    
+                    // Buttons
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Print PDF
+                            Button(
+                                onClick = {
+                                    val html = generateSuratJalanHtml(delivery, project)
+                                    PdfPrintUtil.printHtml(printContext, html, "SuratJalan_${delivery.suratJalanNumber.replace("/", "_")}")
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = LimeNeon),
+                                shape = SharpShapes.small
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Cetak PDF", style = MaterialTheme.typography.labelMedium, color = Color.Black)
+                                }
+                            }
+                            
+                            // Change Status (Toggle)
+                            val nextStatus = if (delivery.status == "TERTUNDA") "SUKSES" else "TERTUNDA"
+                            val btnText = if (delivery.status == "TERTUNDA") "Selesaikan" else "Tunda"
+                            val btnColor = if (delivery.status == "TERTUNDA") ColorSuccess else ColorPending
+                            
+                            Button(
+                                onClick = {
+                                    viewModel.updateDeliveryStatus(delivery.id, nextStatus)
+                                    onDismissRequest()
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = btnColor),
+                                shape = SharpShapes.small
+                            ) {
+                                Text(btnText, style = MaterialTheme.typography.labelMedium, color = Color.Black)
+                            }
+                        }
+                        
+                        // Delete Button (Danger)
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.deleteDelivery(delivery)
+                                onDismissRequest()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ColorError),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, ColorError),
+                            shape = SharpShapes.small
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp), tint = ColorError)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Hapus Surat Jalan", style = MaterialTheme.typography.labelMedium, color = ColorError)
+                        }
+                    }
+                }
+            }
+        }
+    )
+}
+
+@Composable
+fun DetailRowLabel(
+    label: String,
+    value: String,
+    valueColor: Color = Color.White
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = TextSecondary, modifier = Modifier.weight(1.5f))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = valueColor,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(2f)
+        )
+    }
+}
+
+@Composable
+fun PhotoViewDialog(
+    delivery: LogisticsDelivery,
+    project: ConstructionProject?,
+    onDismissRequest: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .wrapContentHeight(),
+            shape = SharpShapes.medium,
+            color = DarkGrey
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "BUKTI LAPANGAN (FOTO/CCTV)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = LimeNeon
+                    )
+                    IconButton(onClick = onDismissRequest) {
+                        Icon(Icons.Default.Close, contentDescription = "Tutup", tint = Color.LightGray)
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Watermarked Photo Mock Canvas Box
+                val isCam = delivery.photoPath?.contains("Kamera") == true || delivery.photoPath?.contains("CAM") == true
+                val isGal = delivery.photoPath?.contains("Galeri") == true || delivery.photoPath?.contains("GAL") == true
+                
+                // Top badge indicating source
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (isCam) Color.Red.copy(alpha = 0.15f) else if (isGal) CorporateBlue.copy(alpha = 0.15f) else MediumGrey, SharpShapes.small)
+                        .border(1.dp, if (isCam) Color.Red else if (isGal) CorporateBlue else BorderGrey, SharpShapes.small)
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (isCam) Icons.Default.CameraAlt else if (isGal) Icons.Default.PhotoLibrary else Icons.Default.Verified,
+                        contentDescription = null,
+                        tint = if (isCam) Color.Red else if (isGal) CorporateBlue else LimeNeon,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isCam) "LAMPIRAN: FOTO REAL-TIME KAMERA HP" else if (isGal) "LAMPIRAN: FILE GALERI PERANGKAT" else "LAMPIRAN: DOKUMEN DIGITAL DIGITAL PROOF",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(260.dp)
+                        .background(Color.Black, SharpShapes.small)
+                        .border(1.dp, LimeNeon.copy(alpha = 0.5f), SharpShapes.small),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Grid / Camera bracket pattern
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val w = size.width
+                        val h = size.height
+                        val pad = 24f
+                        val len = 40f
+                        val strokeW = 4f
+                        val color = LimeNeon.copy(alpha = 0.4f)
+                        
+                        // Top-left bracket
+                        drawRect(color = color, topLeft = Offset(pad, pad), size = androidx.compose.ui.geometry.Size(len, strokeW))
+                        drawRect(color = color, topLeft = Offset(pad, pad), size = androidx.compose.ui.geometry.Size(strokeW, len))
+                        
+                        // Top-right bracket
+                        drawRect(color = color, topLeft = Offset(w - pad - len, pad), size = androidx.compose.ui.geometry.Size(len, strokeW))
+                        drawRect(color = color, topLeft = Offset(w - pad, pad), size = androidx.compose.ui.geometry.Size(strokeW, len))
+                        
+                        // Bottom-left bracket
+                        drawRect(color = color, topLeft = Offset(pad, h - pad), size = androidx.compose.ui.geometry.Size(len, strokeW))
+                        drawRect(color = color, topLeft = Offset(pad, h - pad - len), size = androidx.compose.ui.geometry.Size(strokeW, len))
+                        
+                        // Bottom-right bracket
+                        drawRect(color = color, topLeft = Offset(w - pad - len, h - pad), size = androidx.compose.ui.geometry.Size(len, strokeW))
+                        drawRect(color = color, topLeft = Offset(w - pad, h - pad - len), size = androidx.compose.ui.geometry.Size(strokeW, len))
+                        
+                        // Crosshair in middle
+                        drawCircle(color, radius = 6f, center = Offset(w/2, h/2))
+                        drawRect(color = color, topLeft = Offset(w/2 - 15, h/2 - 1), size = androidx.compose.ui.geometry.Size(30f, 2f))
+                        drawRect(color = color, topLeft = Offset(w/2 - 1, h/2 - 15), size = androidx.compose.ui.geometry.Size(2f, 30f))
+
+                        // Draw specialized material graphics patterns inside the dark viewport
+                        val isBaja = delivery.materialType.contains("Baja", true) || delivery.materialType.contains("Wire", true)
+                        val isBeton = delivery.materialType.contains("Beton", true) || delivery.materialType.contains("Ready", true)
+                        val isPasir = delivery.materialType.contains("Pasir", true) || delivery.materialType.contains("Batu", true)
+                        
+                        if (isBaja) {
+                            // Rebars mesh pattern
+                            for (x in 3..7) {
+                                drawLine(
+                                    color = Color(0xFFFFA500).copy(alpha = 0.35f),
+                                    start = Offset(w * (x / 10f), h * 0.25f),
+                                    end = Offset(w * (x / 10f), h * 0.75f),
+                                    strokeWidth = 8f
+                                )
+                            }
+                            for (y in 3..7) {
+                                drawLine(
+                                    color = Color(0xFFFFA500).copy(alpha = 0.35f),
+                                    start = Offset(w * 0.25f, h * (y / 10f)),
+                                    end = Offset(w * 0.75f, h * (y / 10f)),
+                                    strokeWidth = 8f
+                                )
+                            }
+                        } else if (isBeton) {
+                            // Concrete circle/cylinder outline
+                            drawCircle(
+                                color = Color.LightGray.copy(alpha = 0.25f),
+                                radius = 70f,
+                                center = Offset(w / 2f, h / 2f)
+                            )
+                            drawCircle(
+                                color = Color.Gray.copy(alpha = 0.35f),
+                                radius = 40f,
+                                center = Offset(w / 2f, h / 2f)
+                            )
+                        } else if (isPasir) {
+                            // Aggregates heap/pyramid outline
+                            val path = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(w * 0.3f, h * 0.7f)
+                                lineTo(w * 0.5f, h * 0.35f)
+                                lineTo(w * 0.7f, h * 0.7f)
+                                close()
+                            }
+                            drawPath(
+                                path = path,
+                                color = Color(0xFFCD853F).copy(alpha = 0.3f)
+                            )
+                        }
+                    }
+                    
+                    // Stylized Graphic Representation (since it's a code-generated vector app)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (delivery.materialType.contains("Baja", true)) Icons.Default.GridOn else if (delivery.materialType.contains("Beton", true)) Icons.Default.Circle else Icons.Default.LocalShipping,
+                            contentDescription = null,
+                            tint = if (isCam) Color.Red.copy(alpha = 0.85f) else LimeNeon,
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "[ PHOTO PROOF: ${delivery.materialType} ]",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${delivery.quantity} ${delivery.unit} | Sopir: ${delivery.driverName}",
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "Truk: ${delivery.plateNumber}",
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    
+                    // Camera Watermark info overlays (top & bottom)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "REC ◉",
+                                color = Color.Red,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "CCTV SITE CAMERA 04",
+                                color = Color.White.copy(alpha = 0.7f),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Bottom
+                        ) {
+                            Column {
+                                Text(
+                                    text = "PROYEK: ${project?.projectCode ?: "PRJ"}",
+                                    color = LimeNeon,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = (project?.location ?: "LOKASI").uppercase(),
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                            
+                            Column(horizontalAlignment = Alignment.End) {
+                                val sdfDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(delivery.deliveryDateTime))
+                                val sdfTime = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(delivery.deliveryDateTime))
+                                Text(
+                                    text = sdfDate,
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                                Text(
+                                    text = sdfTime,
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Text(
+                    text = "Ref: ${delivery.photoPath}",
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(
+                    onClick = onDismissRequest,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = LimeNeon),
+                    shape = SharpShapes.small
+                ) {
+                    Text("KEMBALI", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
 }

@@ -10,7 +10,7 @@ data class ConstructionProject(
     val projectCode: String,
     val name: String,
     val location: String,
-    val status: String, // "AKTIF", "SELESAI"
+    val status: String, // "AKTIF", "SUKSES"
     val contractValue: Double // Nilai Kontrak / Anggaran
 ) : Serializable
 
