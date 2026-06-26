@@ -38,14 +38,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
-        // Automatically seed some professional data if the database is currently empty
-        viewModelScope.launch {
-            projects.first().let { currentProjects ->
-                if (currentProjects.isEmpty()) {
-                    seedDatabase()
-                }
-            }
-        }
+        // Seeding disabled for clean production build with real data
     }
 
     fun selectTab(tab: String) {
@@ -148,8 +141,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         daysCount.toList()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), List(7) { 0.0 })
 
-    // Seeding dummy data
+    // Seeding dummy data (disabled for production)
     private suspend fun seedDatabase() {
+        val disabled = true
+        if (disabled) return
         val proj1 = ConstructionProject(
             projectCode = "PRJ-SDR-001",
             name = "Apartemen Grand Sudirman",
